@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Đặt hàng thành công</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f6f8fb;
+        padding: 24px;
+        margin: 0;
+      }
+      .container {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        color: #0f9f6e;
+        margin: 0 0 16px 0;
+        font-size: 24px;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 16px;
+        background: #f9fafb;
+        border-radius: 8px;
+      }
+      .label {
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .value {
+        color: #1f2937;
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+      }
+      th {
+        background: #f3f4f6;
+        padding: 10px;
+        text-align: left;
+        font-size: 13px;
+        color: #6b7280;
+      }
+      td {
+        padding: 10px;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 14px;
+        color: #374151;
+      }
+      .total {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f9f6e;
+        text-align: right;
+        padding-top: 12px;
+      }
+      .footer {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+        color: #6b7280;
+        font-size: 13px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body th:inline="text">
+    <div class="container">
+      <h1>🎉 Đặt hàng thành công!</h1>
+
+      <p style="color: #374151; font-size: 15px; line-height: 1.6">
+        Xin chào <strong>[[${customerName}]]</strong>,<br />
+        Cảm ơn bạn đã đặt hàng tại PDQ Restaurant. Đơn hàng của bạn đã được tiếp
+        nhận và đang được xử lý.
+      </p>
+
+      <div class="section">
+        <div class="label">Mã đơn hàng</div>
+        <div
+          class="value"
+          style="font-size: 18px; font-weight: 700; color: #0f9f6e"
+        >
+          #[[${orderNumber}]]
+        </div>
+
+        <div class="label">Thời gian đặt</div>
+        <div class="value">[[${orderDate}]]</div>
+
+        <div class="label">Phương thức thanh toán</div>
+        <div class="value">[[${paymentMethod}]]</div>
+      </div>
+
+      <div class="section">
+        <div class="label">Địa chỉ giao hàng</div>
+        <div class="value">[[${deliveryAddress}]]</div>
+
+        <div class="label">Số điện thoại</div>
+        <div class="value">[[${phone}]]</div>
+      </div>
+
+      <h3 style="color: #374151; font-size: 16px; margin: 24px 0 12px 0">
+        Chi tiết đơn hàng
+      </h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Sản phẩm</th>
+            <th style="text-align: center">Số lượng</th>
+            <th style="text-align: right">Giá</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="item : ${orderItems}">
+            <td>[[${item.productName}]]</td>
+            <td style="text-align: center">[[${item.quantity}]]</td>
+            <td style="text-align: right">[[${item.price}]]</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="total">Tổng cộng: [[${totalAmount}]]</div>
+
+      <p
+        style="
+          color: #374151;
+          font-size: 14px;
+          line-height: 1.6;
+          margin-top: 24px;
+        "
+      >
+        Chúng tôi sẽ liên hệ với bạn sớm nhất để xác nhận và giao hàng.<br />
+        Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ hotline hoặc reply email
+        này.
+      </p>
+
+      <div class="footer">
+        <strong>PDQ Restaurant</strong><br />
+        Giao hàng nhanh · Chất lượng đảm bảo · Hỗ trợ 24/7
+      </div>
+    </div>
+  </body>
+</html>
+EOF

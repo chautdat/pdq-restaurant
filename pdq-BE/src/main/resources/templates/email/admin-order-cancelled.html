@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Đơn hàng bị hủy</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f8fb; padding:24px; }
+    .card { max-width:640px; margin:0 auto; background:#fff; border-radius:12px; padding:28px; box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    h1 { color:#c0392b; margin-bottom:12px; }
+    p { color:#333; line-height:1.6; margin:6px 0; }
+    .label { color:#666; font-size:13px; }
+  </style>
+</head>
+<body th:inline="text">
+  <div class="card">
+    <h1>Đơn hàng bị hủy</h1>
+    <p><span class="label">Đơn:</span> # [[${orderNumber}]]</p>
+    <p><span class="label">Trạng thái:</span> [[${oldStatus}]] → [[${newStatus}]]</p>
+    <p><span class="label">Khách:</span> [[${customerName}]]</p>
+    <p><span class="label">Địa chỉ:</span> [[${deliveryAddress}]]</p>
+  </div>
+</body>
+</html>

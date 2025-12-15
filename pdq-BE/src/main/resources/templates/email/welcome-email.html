@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Chào mừng</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f8fb; padding:24px; }
+    .card { max-width:600px; margin:0 auto; background:#fff; border-radius:12px; padding:28px; box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    h1 { color:#0f9f6e; margin-bottom:12px; }
+    p { color:#333; line-height:1.6; }
+    .footer { margin-top:20px; color:#777; font-size:12px; }
+  </style>
+</head>
+<body th:inline="text">
+  <div class="card">
+    <h1>Chào mừng [[${name}]]</h1>
+    <p>Cảm ơn bạn đã gia nhập PDQ Restaurant. Hãy đặt món và trải nghiệm dịch vụ của chúng tôi!</p>
+    <p><a href="http://localhost:8080/#/menu" style="color:#0f9f6e;font-weight:bold;">Khám phá menu ngay</a></p>
+    <div class="footer">PDQ Restaurant</div>
+  </div>
+</body>
+</html>

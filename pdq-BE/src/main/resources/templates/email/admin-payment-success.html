@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Thanh toán online thành công</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f8fb; padding:24px; }
+    .card { max-width:640px; margin:0 auto; background:#fff; border-radius:12px; padding:28px; box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    h1 { color:#0f9f6e; margin-bottom:12px; }
+    p { color:#333; line-height:1.6; margin:6px 0; }
+    .label { color:#666; font-size:13px; }
+  </style>
+</head>
+<body th:inline="text">
+  <div class="card">
+    <h1>Thanh toán online thành công</h1>
+    <p><span class="label">Đơn hàng:</span> # [[${orderNumber}]]</p>
+    <p><span class="label">Khách:</span> [[${customerName}]] · [[${phone}]]</p>
+    <p><span class="label">Số tiền:</span> [[${amount}]]</p>
+    <p><span class="label">Phương thức:</span> [[${paymentMethod}]]</p>
+  </div>
+</body>
+</html>

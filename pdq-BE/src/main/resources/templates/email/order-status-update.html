@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Cập nhật trạng thái đơn hàng</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f8fb; padding:24px; }
+    .card { max-width:640px; margin:0 auto; background:#fff; border-radius:12px; padding:28px; box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    h1 { color:#0f9f6e; margin-bottom:12px; }
+    p { color:#333; line-height:1.6; margin:8px 0; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:8px; background:#eef7f2; color:#0f9f6e; font-weight:700; }
+    .footer { margin-top:20px; color:#777; font-size:12px; }
+  </style>
+</head>
+<body th:inline="text">
+  <div class="card">
+    <h1>Trạng thái đơn hàng thay đổi</h1>
+    <p>Xin chào [[${customerName}]],</p>
+    <p>Đơn hàng <strong># [[${orderNumber}]]</strong> vừa cập nhật trạng thái:</p>
+    <p><span class="badge">[[${oldStatus}]]</span> → <span class="badge">[[${newStatus}]]</span></p>
+    <p><strong>Địa chỉ giao:</strong> [[${deliveryAddress}]]</p>
+    <p>Chúng tôi sẽ tiếp tục thông báo khi có thay đổi tiếp theo.</p>
+    <div class="footer">PDQ Restaurant · Liên hệ hỗ trợ khi cần.</div>
+  </div>
+</body>
+</html>

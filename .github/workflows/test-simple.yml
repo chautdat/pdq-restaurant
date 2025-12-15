@@ -1,0 +1,27 @@
+name: Test CI
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  hello-world:
+    name: Hello World Job
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Say Hello
+        run: echo "Hello from GitHub Actions!"
+      
+      - name: Show Date
+        run: date
+      
+      - name: Show User
+        run: whoami
+      
+      - name: Show Repository
+        run: echo "Repository chautdat/pdq-restaurant"
+      
+      - name: Success
+        run: echo "✅ Workflow chạy thành công!"

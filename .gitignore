@@ -1,0 +1,59 @@
+# ==========================================
+# PDQ RESTAURANT - GITIGNORE
+# ==========================================
+
+# ========== JAVA ==========
+*.class
+*.jar
+*.war
+*.ear
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# ========== NODE ==========
+node_modules/
+dist/
+npm-debug.log*
+.DS_Store
+
+# ========== IDE ==========
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ========== ENVIRONMENT VARIABLES ==========
+.env
+.env.*
+!.env.example
+*.env
+docker/.env
+
+# ========== DOCKER ==========
+docker-compose.override.yml
+
+# ========== LOGS ==========
+*.log
+logs/
+
+# ========== OS ==========
+Thumbs.db
+.DS_Store
+
+# ========== APPLICATION CONFIG ==========
+application-dev.properties
+application-prod.properties
+**/application.yml
+**/application.yaml
+!**/application.yml.example
+
+# ========== SECRETS & API KEYS ==========
+deploy-groq.sh
+deploy*.sh
+*_secret*
+*_key*
+
+# ========== UPLOADS ==========
+uploads/
+!uploads/.gitkeep
