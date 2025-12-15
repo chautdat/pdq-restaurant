@@ -57,3 +57,23 @@ deploy*.sh
 # ========== UPLOADS ==========
 uploads/
 !uploads/.gitkeep
+# MySQL Data Files (Docker volumes)
+docker/mysql/data/
+docker/mysql/logs/
+**/mysql/data/
+**/aria_log*
+**/ib_logfile*
+**/ibdata*
+**/ibtmp*
+
+# MySQL Data Files
+docker/mysql/data/
+docker/mysql/logs/
+**/aria_log*
+**/ib_logfile*
+**/ibdata*
+**/ibtmp*
+
+# Docker volumes
+**/data/
+volumes/
