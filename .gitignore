@@ -60,6 +60,7 @@ uploads/
 # MySQL Data Files (Docker volumes)
 docker/mysql/data/
 docker/mysql/logs/
+docker/mysql/backups/
 **/mysql/data/
 **/aria_log*
 **/ib_logfile*
