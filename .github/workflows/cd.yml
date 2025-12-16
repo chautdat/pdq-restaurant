@@ -1,96 +1,120 @@
-name: CD - Deploy
+name: Database Backup
 
-# ⚠️ DISABLED - Chỉ chạy manual (chưa có production server)
 on:
-  workflow_dispatch: # Chỉ chạy khi click manual
-  # push:             # ← TẮT auto chạy khi push
-  #   branches: [main]
-
-env:
-  DOCKER_REGISTRY: docker.io
-  IMAGE_PREFIX: ${{ secrets.DOCKERHUB_USERNAME }}/pdq
+  schedule:
+    - cron: "0 2 * * *" # Daily 2AM UTC
+  workflow_dispatch:
+    inputs:
+      backup_name:
+        description: "Custom backup name"
+        required: false
+        default: "manual-backup"
 
 jobs:
-  # ========== BUILD JOBS (VẪN CHẠY KHI MANUAL) ==========
-  build-backend:
-    name: Build Backend
+  backup:
+    name: Backup MySQL Database
     runs-on: ubuntu-latest
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v3
 
-      - name: ☕ Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: "17"
-          distribution: "temurin"
-          cache: "maven"
+      - name: 🏷️ Set backup filename
+        id: backup-info
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          if [ "${{ github.event.inputs.backup_name }}" != "" ]; then
+            BACKUP_NAME="${{ github.event.inputs.backup_name }}_${TIMESTAMP}"
+          else
+            BACKUP_NAME="pdq_restaurant_${TIMESTAMP}"
+          fi
+          echo "filename=${BACKUP_NAME}.sql" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
 
-      - name: 🔨 Build with Maven
-        working-directory: pdq-BE
-        run: mvn clean package -DskipTests
+      - name: 📦 Install MySQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
 
-      - name: 📦 Upload JAR artifact
+      - name: 💾 Create Database Backup
+        run: |
+          echo "🔄 Connecting to database..."
+          echo "Host: ${{ secrets.DB_HOST || 'localhost' }}"
+          echo "Port: ${{ secrets.DB_PORT || '3306' }}"
+          echo "User: ${{ secrets.DB_USER || 'root' }}"
+
+          mysqldump \
+            --host="${{ secrets.DB_HOST || 'localhost' }}" \
+            --port="${{ secrets.DB_PORT || '3306' }}" \
+            --user="${{ secrets.DB_USER || 'root' }}" \
+            --password="${{ secrets.DB_PASSWORD }}" \
+            --databases pdq_restaurant \
+            --add-drop-database \
+            --routines \
+            --triggers \
+            --events \
+            --single-transaction \
+            --quick \
+            --lock-tables=false \
+            > ${{ steps.backup-info.outputs.filename }} || {
+              echo "❌ Backup failed!"
+              echo "Please check:"
+              echo "1. DB_HOST, DB_PORT, DB_USER, DB_PASSWORD secrets are set"
+              echo "2. Database is accessible from GitHub Actions"
+              echo "3. Database name 'pdq_restaurant' is correct"
+              exit 1
+            }
+
+          echo "✅ Backup created successfully!"
+          ls -lh ${{ steps.backup-info.outputs.filename }}
+
+      - name: 🗜️ Compress backup
+        run: |
+          gzip ${{ steps.backup-info.outputs.filename }}
+          echo "✅ Backup compressed: ${{ steps.backup-info.outputs.filename }}.gz"
+          ls -lh ${{ steps.backup-info.outputs.filename }}.gz
+
+      - name: 📤 Upload to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jar
-          path: pdq-BE/target/*.jar
-          retention-days: 7
+          name: database-backup-${{ steps.backup-info.outputs.timestamp }}
+          path: ${{ steps.backup-info.outputs.filename }}.gz
+          retention-days: 30
 
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v3
-
-      - name: 📦 Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: 📥 Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: 🔨 Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: 📦 Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-          retention-days: 7
-
-  # ========== DOCKER & DEPLOY (DISABLED) ==========
-  placeholder:
-    name: Deploy Info
-    runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
-
-    steps:
-      - name: ℹ️ Deployment Info
+      - name: ✅ Backup Summary
+        if: success()
         run: |
           echo "=========================================="
-          echo "CD Pipeline - Manual Mode Only"
+          echo "✅ Database Backup Successful"
           echo "=========================================="
           echo ""
-          echo "✅ Backend build: SUCCESS"
-          echo "✅ Frontend build: SUCCESS"
+          echo "📦 Backup file: ${{ steps.backup-info.outputs.filename }}.gz"
+          echo "⏰ Timestamp: ${{ steps.backup-info.outputs.timestamp }}"
+          echo "📥 Download: Go to Actions → This workflow run → Artifacts"
           echo ""
-          echo "⚠️  Docker build & push: DISABLED"
-          echo "⚠️  Server deployment: DISABLED"
+          echo "Retention: 30 days"
+          echo "=========================================="
+
+      - name: ❌ Backup Failed
+        if: failure()
+        run: |
+          echo "=========================================="
+          echo "❌ Database Backup Failed"
+          echo "=========================================="
           echo ""
-          echo "Reason: No production server configured yet"
+          echo "Troubleshooting:"
+          echo "1. Check GitHub Secrets:"
+          echo "   - DB_HOST (default: localhost)"
+          echo "   - DB_PORT (default: 3306)"
+          echo "   - DB_USER (default: root)"
+          echo "   - DB_PASSWORD (REQUIRED)"
           echo ""
-          echo "To enable:"
-          echo "1. Add Docker Hub credentials to GitHub Secrets"
-          echo "2. Add server SSH credentials"
-          echo "3. Uncomment 'push' trigger in workflow"
+          echo "2. Verify database is accessible"
+          echo "3. Check database name: pdq_restaurant"
+          echo ""
+          echo "Current values (masked):"
+          echo "Host: ${{ secrets.DB_HOST || 'localhost' }}"
+          echo "Port: ${{ secrets.DB_PORT || '3306' }}"
+          echo "User: ${{ secrets.DB_USER || 'root' }}"
+          echo "Password: ${{ secrets.DB_PASSWORD != '' && '✓ Set' || '✗ NOT SET' }}"
           echo "=========================================="
