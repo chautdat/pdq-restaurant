@@ -8,7 +8,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,9 +37,9 @@ public class ChatController {
 
             boolean isMenuQuery = lowerMessage.contains("thực đơn") ||
                 lowerMessage.contains("menu") ||
-                lowerMessage.contains("món") ||
-                lowerMessage.contains("có món") ||
                 lowerMessage.contains("món nào") ||
+                lowerMessage.contains("các món") ||
+                lowerMessage.contains("danh sách món") ||
                 lowerMessage.contains("bán gì") ||
                 lowerMessage.contains("có gì");
 
@@ -142,17 +145,79 @@ public class ChatController {
     }
 
     private String extractKeyword(String message) {
-        String[] words = message.toLowerCase().split(" ");
-        String[] skipWords = {"có", "món", "không", "tìm", "kiếm", "search", "xem", "thử", "được", "à", "ạ", "nhé"};
+        if (message == null) {
+            return "";
+        }
 
-        for (String word : words) {
-            word = word.trim();
-            if (word.length() > 2 && !Arrays.asList(skipWords).contains(word)) {
-                return word;
+        // Normalize: lowercase + remove punctuation (keep letters/numbers/spaces)
+        String normalized = message
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("[^\\p{L}\\p{N}\\s]", " ")
+            .replaceAll("\\s+", " ")
+            .trim();
+
+        if (normalized.isBlank()) {
+            return "";
+        }
+
+        // Case: "có <món> không/ko/k/hk" (e.g. "có cơm sườn không")
+        Pattern coKhong = Pattern.compile(
+            "\\b(có|co)\\b\\s+(.+?)\\s+\\b(không|khong|ko|k|hk|hông|hong)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+        );
+        Matcher m1 = coKhong.matcher(normalized);
+        if (m1.find()) {
+            String keyword = m1.group(2).trim();
+            // cleanup fillers
+            keyword = keyword.replaceAll("^\\b(món|mon)\\b\\s+", "").trim();
+            keyword = keyword.replaceAll("\\s+\\b(hay)\\b$", "").trim(); // "có ... hay không"
+            if (!keyword.isBlank()) {
+                return keyword;
             }
         }
 
-        return message;
+        // Case: "tìm/kiếm/search <món>"
+        Pattern findPattern = Pattern.compile(
+            "\\b(tìm|tim|kiếm|kiem|search)\\b\\s+(?:món|mon)?\\s*(.+)$",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+        );
+        Matcher m2 = findPattern.matcher(normalized);
+        if (m2.find()) {
+            String keyword = m2.group(2).trim();
+            if (!keyword.isBlank()) {
+                return keyword;
+            }
+        }
+
+        // Fallback: remove common stop-words and keep the remaining phrase
+        String[] words = normalized.split(" ");
+        String[] skipWords = {
+            "có","co","món","mon","không","khong","ko","k","hk","hông","hong",
+            "tìm","tim","kiếm","kiem","search",
+            "xem","thử","được","duoc","à","ạ","nhé","nhe","ơi","oi",
+            "bạn","ban","anh","chị","chi","em","ad","admin",
+            "cho","mình","minh","tôi","toi","muốn","muon","hỏi","hoi","về","ve",
+            "quán","quan","nhà","nha","hàng","hang","nhàhàng","nhahang",
+            "hay"
+        };
+
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {
+            String word = w.trim();
+            if (word.length() <= 1) {
+                continue;
+            }
+            if (Arrays.asList(skipWords).contains(word)) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(word);
+        }
+
+        String keyword = sb.toString().trim();
+        return keyword.isBlank() ? normalized : keyword;
     }
 
     private Map<String, Object> createErrorResponse(String message) {

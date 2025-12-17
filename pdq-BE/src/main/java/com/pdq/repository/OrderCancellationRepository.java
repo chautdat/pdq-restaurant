@@ -10,4 +10,5 @@ import com.pdq.entity.OrderCancellation;
 @Repository
 public interface OrderCancellationRepository extends JpaRepository<OrderCancellation, Long> {
     Optional<OrderCancellation> findByOrderOrderId(Long orderId);
+    void deleteByOrderOrderId(Long orderId);
 }

@@ -750,6 +750,18 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
+        // Xóa các bảng con trước để tránh lỗi FK (một số DB env có thể chưa áp dụng ON DELETE CASCADE).
+        try {
+            paymentLogRepository.deleteByOrderOrderId(orderId);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to delete payment logs for order " + orderId + ": " + e.getMessage());
+        }
+        try {
+            cancellationRepository.deleteByOrderOrderId(orderId);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to delete cancellations for order " + orderId + ": " + e.getMessage());
+        }
+
         // Admin có thể xóa bất kỳ đơn hàng nào.
         // Lưu ý về tồn kho:
         // - Nếu đơn đã "cancelled" thì tồn kho đã được hoàn lại khi hủy → không hoàn lại lần nữa.

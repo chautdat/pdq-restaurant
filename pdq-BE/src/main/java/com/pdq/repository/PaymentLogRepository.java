@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface PaymentLogRepository extends JpaRepository<PaymentLog, Long> {
     List<PaymentLog> findByOrderOrderIdOrderByCreatedAtDesc(Long orderId);
     Optional<PaymentLog> findByTransactionId(String transactionId);
+    void deleteByOrderOrderId(Long orderId);
 }

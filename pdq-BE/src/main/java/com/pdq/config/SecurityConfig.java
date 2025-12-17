@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 .requestMatchers("/uploads/**", "/images/**", "/static/**").permitAll()
                 .requestMatchers("/api/payment/**").permitAll()
+                .requestMatchers("/api/chat/**").permitAll()
 
                 // ===== ADMIN ONLY =====
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
