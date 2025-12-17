@@ -9,41 +9,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: ℹ️ Deployment Info
+      - name: Deploy Info
         run: |
           echo "=========================================="
-          echo "🚀 CD - Deploy Workflow"
+          echo "CD - Deploy Workflow"
           echo "=========================================="
           echo ""
-          echo "✅ Manual deployment mode enabled"
+          echo "✅ Manual deployment mode"
           echo ""
-          echo "📍 Current Setup:"
-          echo "   • Environment: Development"
-          echo "   • Deployment: Manual trigger only"
-          echo "   • Auto-deploy: Disabled"
-          echo ""
-          echo "🔧 To enable automatic deployment:"
-          echo "   1. Setup production server"
-          echo "   2. Add deployment credentials to GitHub Secrets:"
-          echo "      - SERVER_HOST"
-          echo "      - SERVER_USER"
-          echo "      - SERVER_SSH_KEY"
-          echo "      - DOCKER_USERNAME"
-          echo "      - DOCKER_PASSWORD"
-          echo ""
-          echo "   3. Update this workflow with:"
-          echo "      - Docker build & push steps"
-          echo "      - SSH deployment commands"
-          echo "      - Health checks"
-          echo ""
-          echo "📦 For now, use local Docker setup:"
-          echo "   cd docker"
-          echo "   docker-compose up -d"
+          echo "This is for production deployment."
+          echo "Currently disabled for development."
           echo ""
           echo "=========================================="
-          echo "Status: Development Mode"
-          echo "=========================================="
-s
