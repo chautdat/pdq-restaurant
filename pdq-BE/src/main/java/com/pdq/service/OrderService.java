@@ -750,17 +750,28 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
-        if (order.getPaymentStatus() == PaymentStatus.paid &&
-                order.getOrderStatus() == OrderStatus.delivered) {
-            throw new BadRequestException("Cannot delete a delivered and paid order");
-        }
+        // Admin có thể xóa bất kỳ đơn hàng nào.
+        // Lưu ý về tồn kho:
+        // - Nếu đơn đã "cancelled" thì tồn kho đã được hoàn lại khi hủy → không hoàn lại lần nữa.
+        // - Nếu đơn đã "delivered" thì không hoàn lại tồn kho (tránh tăng stock sai).
+        boolean shouldRevertInventory = order.getOrderStatus() != OrderStatus.cancelled
+                && order.getOrderStatus() != OrderStatus.delivered;
 
         if (order.getItems() != null) {
-            for (OrderItem item : order.getItems()) {
-                Product product = item.getProduct();
-                product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
-                product.setSoldCount(product.getSoldCount() - item.getQuantity());
-                productRepository.save(product);
+            if (shouldRevertInventory) {
+                for (OrderItem item : order.getItems()) {
+                    Product product = item.getProduct();
+                    if (product == null) {
+                        continue;
+                    }
+                    int currentStock = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+                    int currentSold = product.getSoldCount() != null ? product.getSoldCount() : 0;
+                    int qty = item.getQuantity() != null ? item.getQuantity() : 0;
+
+                    product.setStockQuantity(currentStock + qty);
+                    product.setSoldCount(Math.max(0, currentSold - qty));
+                    productRepository.save(product);
+                }
             }
 
             orderItemRepository.deleteAll(order.getItems());

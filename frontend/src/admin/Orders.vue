@@ -831,27 +831,11 @@ export default {
       });
       if (!result.isConfirmed) return;
       try {
-        const token = storage.getToken();
-        if (!token) return this.$router.push("/login");
-
         const id = order.orderId || order.id;
         if (!id) throw new Error("Không tìm thấy ID đơn hàng");
 
-        // Backend chỉ cho hủy đơn trạng thái pending
-        const status = (order.orderStatus || order.status || "").toString().toLowerCase();
-        if (status !== "pending") {
-          return this.toastError(
-            "Lỗi",
-            "Chỉ hủy được đơn ở trạng thái Chờ xác nhận (pending)"
-          );
-        }
-
-        // Backend không hỗ trợ DELETE, dùng cancel API
-        await api.post(
-          `/orders/${id}/cancel`,
-          { reason: "Admin cancelled order" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        // Admin có thể xóa bất kỳ đơn hàng nào (hard delete)
+        await api.delete(`/admin/orders/${id}`);
 
         this.toastSuccess("Thành công!", "Đã xóa đơn hàng.");
         this.fetchOrders();

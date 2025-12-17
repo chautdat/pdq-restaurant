@@ -106,7 +106,7 @@ services:
       - "http"
       - "backend:3000"
     environment:
-      NGROK_AUTHTOKEN: 2nPTuqV35oV1szPExbEcouWcgjS6viWm3M_7QpTdLn9u37jbAeJeccwy
+      NGROK_AUTHTOKEN: 35oV1szPExbEcouWcgjS6viWm3M_7QpTdLn9u37jbAeJeccwy
     ports:
       - "4040:4040"
     networks:

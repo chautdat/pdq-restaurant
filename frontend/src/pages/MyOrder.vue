@@ -1,222 +1,265 @@
 <template>
   <div class="my-order-page">
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-content">
-        <div class="header-title">
-          <i class="fas fa-clipboard-list"></i>
-          <div>
-            <h1>Đơn Hàng Của Tôi</h1>
-            <p>Theo dõi trạng thái đơn hàng của bạn</p>
+    <!-- Modern Header -->
+    <header class="page-header">
+      <div class="container">
+        <div class="header-content">
+          <div class="header-left">
+            <div class="icon-wrapper">
+              <i class="fas fa-receipt"></i>
+            </div>
+            <div class="header-text">
+              <h1>Đơn Hàng Của Tôi</h1>
+              <p>Theo dõi và quản lý đơn hàng của bạn</p>
+            </div>
           </div>
-        </div>
-        <div class="header-stats">
-          <div class="stat-card">
-            <i class="fas fa-box"></i>
-            <div>
+          <div class="header-right">
+            <div class="stat-badge">
               <span class="stat-number">{{ orders.length }}</span>
-              <span class="stat-label">Đơn hàng</span>
+              <span class="stat-label">Tổng đơn</span>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Loading -->
-    <div v-if="isLoading" class="loading-container">
-      <div class="spinner-large"></div>
+    <!-- Filters Section -->
+    <section class="filters-section">
+      <div class="container">
+        <div class="filters-card">
+          <div class="filter-group">
+            <label>
+              <i class="fas fa-calendar"></i>
+              Lọc theo ngày
+            </label>
+            <div class="date-picker-wrapper">
+              <input
+                type="date"
+                v-model="selectedDate"
+                class="date-input"
+                placeholder="Chọn ngày"
+              />
+              <button
+                v-if="selectedDate"
+                @click="selectedDate = ''"
+                class="clear-btn"
+                type="button"
+              >
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <div v-if="isLoading" class="loading-state">
+      <div class="spinner"></div>
       <p>Đang tải đơn hàng...</p>
     </div>
 
-    <!-- Orders List -->
-    <div v-else class="orders-container">
-      <div v-if="orders.length > 0" class="orders-grid">
-        <!-- ORDER CARD -->
-        <div v-for="order in orders" :key="order.orderId" class="order-card">
-          <!-- Header -->
-          <div class="order-header">
-            <div class="order-id">
-              <i class="fas fa-receipt"></i>
-              <span>{{ order.orderNumber }}</span>
-            </div>
-            <div class="header-badges">
-              <span
-                :class="[
-                  'badge',
-                  'status-' + normalizeStatus(order.orderStatus),
-                ]"
-              >
-                {{ getOrderStatusText(order.orderStatus) }}
-              </span>
-              <span
-                :class="[
-                  'badge',
-                  'payment-' + normalizeStatus(order.paymentStatus),
-                ]"
-              >
-                {{ getPaymentStatusText(order.paymentStatus) }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Info -->
-          <div class="order-info-grid">
-            <div class="info-item">
-              <i class="fas fa-calendar-check"></i>
-              <div>
-                <span class="info-label">Thời gian</span>
-                <p class="info-value">{{ formatDate(order.createdAt) }}</p>
-              </div>
-            </div>
-
-            <div class="info-item">
-              <i class="fas fa-credit-card"></i>
-              <div>
-                <span class="info-label">Thanh toán</span>
-                <p class="info-value">
-                  {{ getPaymentMethodText(order.paymentMethod) }}
-                </p>
-              </div>
-            </div>
-
-            <div class="info-item">
-              <i class="fas fa-map-marker-alt"></i>
-              <div>
-                <span class="info-label">Địa chỉ</span>
-                <p class="info-value">{{ getAddress(order) }}</p>
-              </div>
-            </div>
-
-            <div class="info-item">
-              <i class="fas fa-phone"></i>
-              <div>
-                <span class="info-label">SĐT</span>
-                <p class="info-value">{{ order.phone }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Items -->
-          <div v-if="getItems(order).length" class="order-items">
-            <h5>📦 Sản phẩm đã đặt:</h5>
-
-            <div
-              v-for="item in getItems(order)"
-              :key="item.orderItemId || item.id || item.productId"
-              class="order-item"
-            >
-              <img :src="getImageUrl(item.productImage)" class="item-image" />
-
-              <div class="item-details">
-                <h4>{{ item.productName }}</h4>
-                <p class="item-quantity">Số lượng: {{ item.quantity }}</p>
-              </div>
-
-              <div class="item-price">
-                <p>{{ formatVND(item.price) }}đ</p>
-                <p class="item-subtotal">
-                  Tổng: {{ formatVND(item.subtotal) }}đ
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Progress -->
-          <div class="progress-container">
-            <div class="progress-bar">
-              <div
-                class="progress-fill"
-                :style="{ width: getProgressWidth(order.orderStatus) + '%' }"
-              ></div>
-            </div>
-
-            <div class="progress-steps">
-              <div
-                v-for="step in progressSteps"
-                :key="step.status"
-                class="progress-step"
-                :class="{
-                  active: isStepActive(order.orderStatus, step.status),
-                }"
-              >
-                <div class="step-dot"><i :class="step.icon"></i></div>
-                <span class="step-label">{{ step.label }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Payment retry / COD -->
+    <!-- Orders Grid -->
+    <section v-else class="orders-section">
+      <div class="container">
+        <!-- Orders List -->
+        <div v-if="displayedOrders.length > 0" class="orders-grid">
           <div
-            v-if="showPaymentActions(order)"
-            class="payment-warning"
+            v-for="order in displayedOrders"
+            :key="order.orderId"
+            class="order-card"
           >
-            <div class="payment-warning-text">
-              ⏳ Thanh toán online chưa hoàn tất
-              <span v-if="getRemainingTime(order)" class="countdown">
-                ({{ getRemainingTime(order) }})
-              </span>
-            </div>
-            <div class="payment-actions-inline">
-              <button
-                v-if="canRetryPayment(order)"
-                class="btn btn-warning"
-                @click="retryPayment(order)"
-                :disabled="actionLoading"
-              >
-                💳 Thanh toán lại
-                <span v-if="getRemainingTime(order)" class="countdown">
-                  ({{ getRemainingTime(order) }})
+            <!-- Card Header -->
+            <div class="card-header">
+              <div class="order-number">
+                <i class="fas fa-hashtag"></i>
+                {{ order.orderNumber }}
+              </div>
+              <div class="status-badges">
+                <span
+                  :class="[
+                    'badge',
+                    'badge-' + normalizeStatus(order.orderStatus),
+                  ]"
+                >
+                  {{ getOrderStatusText(order.orderStatus) }}
                 </span>
-              </button>
-              <button
-                v-if="canConvertToCOD(order)"
-                class="btn btn-outline"
-                @click="convertToCOD(order)"
-                :disabled="actionLoading"
-              >
-                💵 Chuyển sang tiền mặt
-              </button>
-              <button
-                v-if="canUserCancel(order)"
-                class="btn btn-ghost-danger"
-                @click="cancelOrder(order)"
-                :disabled="actionLoading"
-              >
-                ❌ Hủy đơn
-              </button>
+                <span
+                  :class="[
+                    'badge',
+                    'badge-payment-' + normalizeStatus(order.paymentStatus),
+                  ]"
+                >
+                  {{ getPaymentStatusText(order.paymentStatus) }}
+                </span>
+              </div>
             </div>
-          </div>
 
-          <!-- Totals -->
-          <div class="order-total">
-            <div class="total-row">
-              <span>Tổng tiền món:</span>
-              <span>{{ formatVND(getSubtotal(order)) }}đ</span>
+            <!-- Order Meta Info -->
+            <div class="order-meta">
+              <div class="meta-item">
+                <i class="fas fa-clock"></i>
+                <span>{{ formatDate(order.createdAt) }}</span>
+              </div>
+              <div class="meta-item">
+                <i class="fas fa-credit-card"></i>
+                <span>{{ getPaymentMethodText(order.paymentMethod) }}</span>
+              </div>
             </div>
-            <div class="total-row">
-              <span>Phí giao hàng:</span>
-              <span>{{ formatVND(getShipping(order)) }}đ</span>
+
+            <!-- Delivery Info -->
+            <div class="delivery-info">
+              <div class="info-row">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>{{ getAddress(order) }}</span>
+              </div>
+              <div class="info-row">
+                <i class="fas fa-phone"></i>
+                <span>{{ order.phone }}</span>
+              </div>
             </div>
-            <div class="total-row final">
-              <span>Tổng cộng:</span>
-              <span class="total-amount"
-                >{{ formatVND(getFinalAmount(order)) }}đ</span
-              >
+
+            <!-- Order Items -->
+            <div v-if="getItems(order).length" class="items-section">
+              <h4 class="section-title">
+                <i class="fas fa-box"></i>
+                Sản phẩm ({{ getItems(order).length }})
+              </h4>
+              <div class="items-list">
+                <div
+                  v-for="item in getItems(order)"
+                  :key="item.orderItemId || item.id"
+                  class="item-row"
+                >
+                  <img :src="getImageUrl(item.productImage)" alt="" />
+                  <div class="item-info">
+                    <h5>{{ item.productName }}</h5>
+                    <span class="item-qty">x{{ item.quantity }}</span>
+                  </div>
+                  <div class="item-price">{{ formatVND(item.subtotal) }}đ</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Tracker -->
+            <div class="progress-tracker">
+              <div class="progress-line">
+                <div
+                  class="progress-bar"
+                  :style="{ width: getProgressWidth(order.orderStatus) + '%' }"
+                ></div>
+              </div>
+              <div class="progress-steps">
+                <div
+                  v-for="step in progressSteps"
+                  :key="step.status"
+                  :class="[
+                    'step',
+                    { active: isStepActive(order.orderStatus, step.status) },
+                  ]"
+                >
+                  <div class="step-icon">
+                    <i :class="step.icon"></i>
+                  </div>
+                  <span class="step-label">{{ step.label }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Warning -->
+            <div v-if="showPaymentActions(order)" class="payment-alert">
+              <div class="alert-content">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Thanh toán online chưa hoàn tất</span>
+                <span v-if="getRemainingTime(order)" class="time-left">
+                  {{ getRemainingTime(order) }}
+                </span>
+              </div>
+              <div class="alert-actions">
+                <button
+                  v-if="canRetryPayment(order)"
+                  @click="retryPayment(order)"
+                  class="btn btn-primary"
+                  :disabled="actionLoading"
+                >
+                  <i class="fas fa-redo"></i>
+                  Thanh toán lại
+                </button>
+                <button
+                  v-if="canConvertToCOD(order)"
+                  @click="convertToCOD(order)"
+                  class="btn btn-secondary"
+                  :disabled="actionLoading"
+                >
+                  <i class="fas fa-money-bill"></i>
+                  Chuyển COD
+                </button>
+                <button
+                  v-if="canUserCancel(order)"
+                  @click="cancelOrder(order)"
+                  class="btn btn-danger"
+                  :disabled="actionLoading"
+                >
+                  <i class="fas fa-times"></i>
+                  Hủy đơn
+                </button>
+              </div>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="order-summary">
+              <div class="summary-row">
+                <span>Tạm tính</span>
+                <span>{{ formatVND(getSubtotal(order)) }}đ</span>
+              </div>
+              <div class="summary-row">
+                <span>Phí vận chuyển</span>
+                <span>{{ formatVND(getShipping(order)) }}đ</span>
+              </div>
+              <div class="summary-row total">
+                <span>Tổng cộng</span>
+                <strong>{{ formatVND(getFinalAmount(order)) }}đ</strong>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Empty -->
-      <div v-else class="empty-state">
-        <div class="empty-icon"><i class="fas fa-box-open"></i></div>
-        <h2>Bạn chưa có đơn hàng nào</h2>
-        <p>Hãy đặt món ngay!</p>
-        <router-link to="/menu" class="order-now-btn">
-          <i class="fas fa-shopping-bag"></i> Đặt món
-        </router-link>
+        <!-- Empty State -->
+        <div v-else class="empty-state">
+          <div class="empty-icon">
+            <i class="fas fa-shopping-bag"></i>
+          </div>
+          <h3>
+            {{
+              selectedDate
+                ? "Không có đơn hàng trong ngày này"
+                : "Chưa có đơn hàng nào"
+            }}
+          </h3>
+          <p>
+            {{
+              selectedDate
+                ? "Thử chọn ngày khác hoặc bỏ lọc"
+                : "Hãy bắt đầu đặt món ngay!"
+            }}
+          </p>
+          <div class="empty-actions">
+            <button
+              v-if="selectedDate"
+              @click="selectedDate = ''"
+              class="btn btn-secondary"
+            >
+              <i class="fas fa-filter"></i>
+              Bỏ lọc
+            </button>
+            <router-link to="/menu" class="btn btn-primary">
+              <i class="fas fa-utensils"></i>
+              Đặt món ngay
+            </router-link>
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
@@ -237,6 +280,7 @@ export default {
       refreshTimer: null,
       autoRefreshMs: 7000,
       countdownTimer: null,
+      selectedDate: "",
 
       progressSteps: [
         { status: "pending", icon: "fas fa-clock", label: "Chờ xác nhận" },
@@ -245,23 +289,28 @@ export default {
           icon: "fas fa-check-circle",
           label: "Đã xác nhận",
         },
-        {
-          status: "preparing",
-          icon: "fas fa-fire-burner",
-          label: "Đang chuẩn bị",
-        },
+        { status: "preparing", icon: "fas fa-fire", label: "Đang chuẩn bị" },
         {
           status: "shipping",
           icon: "fas fa-shipping-fast",
           label: "Đang giao",
         },
-        { status: "delivered", icon: "fas fa-home", label: "Đã giao" },
+        {
+          status: "delivered",
+          icon: "fas fa-check-double",
+          label: "Hoàn thành",
+        },
       ],
     };
   },
 
   computed: {
     ...mapState(["user"]),
+
+    displayedOrders() {
+      if (!this.selectedDate) return this.orders;
+      return this.orders.filter((o) => this.isSameDate(o.createdAt));
+    },
   },
 
   mounted() {
@@ -304,8 +353,6 @@ export default {
       try {
         const res = await api.get("/orders/my-orders");
 
-        console.log("🔍 Orders API:", res.data);
-
         const apiData = res.data;
         if (apiData.success) {
           const data = apiData.data;
@@ -328,7 +375,16 @@ export default {
       }
     },
 
-    /* UTIL FUNCS */
+    isSameDate(date) {
+      if (!date || !this.selectedDate) return false;
+      const d = new Date(date);
+      const t = new Date(this.selectedDate);
+      return (
+        d.getFullYear() === t.getFullYear() &&
+        d.getMonth() === t.getMonth() &&
+        d.getDate() === t.getDate()
+      );
+    },
 
     getImageUrl(path) {
       if (!path) return "/images/notfound.png";
@@ -351,7 +407,9 @@ export default {
       if (!order) return order;
       return {
         ...order,
-        orderStatus: (order.orderStatus || order.status || "").toString().toLowerCase(),
+        orderStatus: (order.orderStatus || order.status || "")
+          .toString()
+          .toLowerCase(),
         paymentStatus: (order.paymentStatus || "").toString().toLowerCase(),
         paymentMethod: (order.paymentMethod || "").toString().toLowerCase(),
       };
@@ -497,7 +555,6 @@ export default {
 
       const subtotalPlusShip = subtotal + shipping;
 
-      // Nếu primary hợp lý (>= subtotalPlusShip * 0.5) thì dùng, ngược lại ưu tiên subtotal + ship
       if (
         primary !== undefined &&
         primary !== null &&
@@ -531,7 +588,6 @@ export default {
 
     showPaymentActions(order) {
       const status = this.normalizeStatus(order.orderStatus);
-      // Chỉ hiển thị khi đơn chưa bị hủy và đang chờ thanh toán online
       if (status === "cancelled") return false;
       return this.canRetryPayment(order) || this.canConvertToCOD(order);
     },
@@ -554,7 +610,7 @@ export default {
       const created = new Date(order.createdAt);
       const now = new Date();
       const diffMs = now - created;
-      return diffMs <= 5 * 60 * 1000; // trong 5 phút
+      return diffMs <= 5 * 60 * 1000;
     },
 
     async cancelOrder(order) {
@@ -701,6 +757,7 @@ export default {
 </script>
 
 <style scoped>
+/* === RESET & VARIABLES === */
 * {
   margin: 0;
   padding: 0;
@@ -708,25 +765,198 @@ export default {
 }
 
 .my-order-page {
+  --primary: #00b067;
+  --primary-dark: #009655;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --radius: 16px;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8f5e9 100%);
-  padding-bottom: 40px;
+  background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
+  padding-bottom: 60px;
 }
 
-/* Loading */
-.loading-container {
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* === HEADER === */
+.page-header {
+  background: linear-gradient(135deg, var(--primary) 0%, #00d97e 100%);
+  padding: 40px 0;
+  box-shadow: 0 4px 20px rgba(0, 176, 103, 0.15);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.icon-wrapper {
+  width: 72px;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+}
+
+.header-text h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: white;
+  margin-bottom: 6px;
+}
+
+.header-text p {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.stat-badge {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  padding: 16px 28px;
+  border-radius: 16px;
   text-align: center;
-  padding: 4rem 0;
+  color: white;
 }
 
-.spinner-large {
-  width: 50px;
-  height: 50px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #00b067;
+.stat-number {
+  display: block;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* === FILTERS === */
+.filters-section {
+  padding: 32px 0 0;
+}
+
+.filters-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 15px;
+}
+
+.filter-group label i {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+.date-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.date-input {
+  padding: 10px 16px;
+  border: 2px solid var(--gray-200);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  transition: all 0.2s;
+  min-width: 180px;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 176, 103, 0.1);
+}
+
+.clear-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-btn:hover {
+  background: var(--danger);
+  color: white;
+}
+
+/* === LOADING === */
+.loading-state {
+  padding: 100px 20px;
+  text-align: center;
+}
+
+.spinner {
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--gray-200);
+  border-top-color: var(--primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 20px;
 }
 
 @keyframes spin {
@@ -735,305 +965,256 @@ export default {
   }
 }
 
-/* Page Header */
-.page-header {
-  background: linear-gradient(135deg, #00b067 0%, #00d97e 100%);
-  padding: 40px 5%;
-  color: white;
-  box-shadow: 0 4px 20px rgba(0, 176, 103, 0.2);
-}
-
-.header-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.header-title i {
-  font-size: 48px;
-  opacity: 0.9;
-}
-
-.header-title h1 {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0 0 4px 0;
-}
-
-.header-title p {
+.loading-state p {
   font-size: 16px;
-  opacity: 0.9;
-  margin: 0;
+  color: var(--gray-500);
+  font-weight: 500;
 }
 
-.header-stats {
-  display: flex;
-  gap: 20px;
-}
-
-.stat-card {
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  padding: 16px 24px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.stat-card i {
-  font-size: 32px;
-}
-
-.stat-number {
-  display: block;
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.stat-label {
-  display: block;
-  font-size: 13px;
-  opacity: 0.9;
-  margin-top: 4px;
-}
-
-/* Orders Container */
-.orders-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 40px 5%;
+/* === ORDERS SECTION === */
+.orders-section {
+  padding: 32px 0;
 }
 
 .orders-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
   gap: 24px;
 }
 
-/* Order Card */
+/* === ORDER CARD === */
 .order-card {
   background: white;
-  border-radius: 20px;
+  border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .order-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--gray-300);
 }
 
-/* Order Header */
-.order-header {
-  background: linear-gradient(135deg, #00b067 0%, #00d97e 100%);
+/* Card Header */
+.card-header {
+  background: linear-gradient(135deg, var(--primary) 0%, #00d97e 100%);
   padding: 20px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
-.order-id {
+.order-number {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: white;
-  font-size: 16px;
   font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.3px;
 }
 
-.order-id i {
-  font-size: 20px;
-}
-
-.header-badges {
+.status-badges {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
 .badge {
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.status-pending {
-  background: #fff3cd;
-  color: #856404;
-}
-.status-confirmed {
-  background: #d1ecf1;
-  color: #0c5460;
-}
-.status-preparing {
-  background: #fff3cd;
-  color: #856404;
-}
-.status-shipping {
-  background: #cce5ff;
-  color: #004085;
-}
-.status-delivered {
-  background: #d4edda;
-  color: #155724;
-}
-.status-cancelled {
-  background: #f8d7da;
-  color: #721c24;
+/* Status Badge Colors */
+.badge-pending {
+  background: #fef3c7;
+  color: #92400e;
 }
 
-.payment-pending {
-  background: #fff3cd;
-  color: #856404;
-}
-.payment-paid {
-  background: #d4edda;
-  color: #155724;
-}
-.payment-failed {
-  background: #f8d7da;
-  color: #721c24;
+.badge-confirmed {
+  background: #dbeafe;
+  color: #1e40af;
 }
 
-/* Order Info Grid */
-.order-info-grid {
-  padding: 24px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.badge-preparing {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.badge-shipping {
+  background: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.badge-delivered {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-cancelled {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.badge-payment-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-payment-paid {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-payment-failed {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+/* Order Meta */
+.order-meta {
+  padding: 16px 24px;
+  display: flex;
   gap: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
 }
 
-.info-item {
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-600);
+}
+
+.meta-item i {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+/* Delivery Info */
+.delivery-info {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.info-row {
   display: flex;
   align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--gray-700);
+}
+
+.info-row i {
+  color: var(--primary);
+  margin-top: 2px;
+  font-size: 16px;
+}
+
+/* Items Section */
+.items-section {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gray-800);
+  margin-bottom: 16px;
+}
+
+.section-title i {
+  color: var(--primary);
+}
+
+.items-list {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.info-item i {
-  font-size: 20px;
-  color: #00b067;
-  margin-top: 2px;
-}
-
-.info-label {
-  display: block;
-  font-size: 12px;
-  color: #666;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.info-value {
-  font-size: 14px;
-  color: #333;
-  font-weight: 600;
-  margin: 0;
-}
-
-/* Order Items */
-.order-items {
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.order-items h5 {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 12px;
-  font-weight: 600;
-}
-
-.order-item {
+.item-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--gray-50);
   border-radius: 12px;
-  margin-bottom: 10px;
+  transition: all 0.2s;
 }
 
-.order-item:last-child {
-  margin-bottom: 0;
+.item-row:hover {
+  background: var(--gray-100);
 }
 
-.item-image {
-  width: 60px;
-  height: 60px;
+.item-row img {
+  width: 56px;
+  height: 56px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm);
 }
 
-.item-details {
+.item-info {
   flex: 1;
 }
 
-.item-details h4 {
+.item-info h5 {
   font-size: 14px;
-  color: #333;
+  font-weight: 600;
+  color: var(--gray-800);
   margin-bottom: 4px;
 }
 
-.item-quantity {
-  font-size: 12px;
-  color: #666;
+.item-qty {
+  font-size: 13px;
+  color: var(--gray-500);
+  font-weight: 500;
 }
 
 .item-price {
-  text-align: right;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
 }
 
-.item-price p {
-  font-size: 14px;
-  color: #00b067;
-  font-weight: 600;
-  margin: 0;
-}
-
-.item-subtotal {
-  font-size: 12px;
-  color: #666;
-  margin-top: 4px;
-}
-
-/* Progress Container */
-.progress-container {
+/* Progress Tracker */
+.progress-tracker {
   padding: 24px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.progress-line {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
 }
 
 .progress-bar {
-  height: 6px;
-  background: #e9ecef;
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-
-.progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00b067 0%, #00d97e 100%);
-  transition: width 0.5s ease;
-  border-radius: 10px;
+  background: linear-gradient(90deg, var(--primary) 0%, #00d97e 100%);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .progress-steps {
@@ -1042,199 +1223,207 @@ export default {
   gap: 8px;
 }
 
-.progress-step {
+.step {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex: 1;
   opacity: 0.4;
-  transition: all 0.3s ease;
+  transition: all 0.3s;
 }
 
-.progress-step.active {
+.step.active {
   opacity: 1;
 }
 
-.progress-step.current .step-dot {
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-.step-dot {
-  width: 36px;
-  height: 36px;
+.step-icon {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #e9ecef;
+  background: var(--gray-200);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
-  transition: all 0.3s ease;
+  margin-bottom: 10px;
+  transition: all 0.3s;
 }
 
-.progress-step.active .step-dot {
-  background: linear-gradient(135deg, #00b067 0%, #00d97e 100%);
+.step.active .step-icon {
+  background: linear-gradient(135deg, var(--primary) 0%, #00d97e 100%);
   color: white;
   box-shadow: 0 4px 12px rgba(0, 176, 103, 0.3);
+  transform: scale(1.05);
 }
 
-.step-dot i {
-  font-size: 16px;
+.step-icon i {
+  font-size: 18px;
 }
 
 .step-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-align: center;
-  color: #666;
+  color: var(--gray-600);
 }
 
-.progress-step.active .step-label {
-  color: #00b067;
+.step.active .step-label {
+  color: var(--primary);
 }
 
-/* Order Total */
-.order-total {
-  padding: 20px 24px;
-  background: #f8fffe;
+/* Payment Alert */
+.payment-alert {
+  margin: 20px 24px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
 }
 
-.total-row {
+.alert-content {
   display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
-  color: #666;
-}
-
-.total-row.final {
-  border-top: 2px solid #e8f6ee;
-  margin-top: 8px;
-  padding-top: 12px;
-  font-size: 16px;
-  color: #333;
-  font-weight: 700;
-}
-
-.total-amount {
-  color: #00b067;
-  font-size: 20px;
-  font-weight: 900;
-}
-
-.btn {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
   font-weight: 600;
-  transition: all 0.2s;
+  color: #78350f;
 }
-.btn-outline {
-  background: white;
-  border: 2px solid #e5e7eb;
-  color: #374151;
+
+.alert-content i {
+  font-size: 20px;
+  color: #f59e0b;
 }
-.btn-outline:hover {
-  border-color: #00b067;
-  color: #00b067;
+
+.time-left {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 16px;
+  color: var(--danger);
 }
-.btn-ghost-danger {
-  background: transparent;
-  color: #ef4444;
-}
-.btn-ghost-danger:hover:not(:disabled) {
-  background: rgba(248, 113, 113, 0.08);
-}
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-.btn-warning:hover:not(:disabled) {
-  background: #d97706;
-}
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.countdown {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #ef4444;
-  margin-left: 6px;
-}
-.payment-warning {
-  background: #fef3c7;
-  border: 1px solid #fbbf24;
-  border-radius: 10px;
-  padding: 12px;
-  margin: 12px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.payment-actions-inline {
+
+.alert-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
+/* Order Summary */
+.order-summary {
+  padding: 20px 24px;
+  background: linear-gradient(to bottom, white 0%, var(--gray-50) 100%);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  color: var(--gray-600);
+}
+
+.summary-row.total {
+  border-top: 2px solid var(--gray-200);
+  margin-top: 8px;
+  padding-top: 16px;
+  font-size: 18px;
+  color: var(--gray-900);
+  font-weight: 700;
+}
+
+.summary-row.total strong {
+  color: var(--primary);
+  font-size: 22px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, #00d97e 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 176, 103, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 176, 103, 0.3);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--gray-700);
+  border: 2px solid var(--gray-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;
-  padding: 80px 20px;
+  padding: 100px 20px;
 }
 
 .empty-icon {
   font-size: 120px;
-  color: #ddd;
+  color: var(--gray-300);
   margin-bottom: 24px;
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
-.empty-state h2 {
-  font-size: 28px;
-  color: #333;
+.empty-state h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-800);
   margin-bottom: 12px;
 }
 
 .empty-state p {
   font-size: 16px;
-  color: #666;
+  color: var(--gray-500);
   margin-bottom: 32px;
 }
 
-.order-now-btn {
-  display: inline-flex;
+.empty-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
   align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #00b067 0%, #00d97e 100%);
-  color: white;
-  padding: 16px 32px;
-  border-radius: 12px;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 16px;
-  box-shadow: 0 4px 16px rgba(0, 176, 103, 0.3);
-  transition: all 0.3s ease;
-}
-
-.order-now-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0, 176, 103, 0.4);
+  flex-wrap: wrap;
 }
 
 /* Responsive */
-@media (max-width: 1200px) {
+@media (max-width: 1024px) {
   .orders-grid {
     grid-template-columns: 1fr;
   }
@@ -1242,7 +1431,7 @@ export default {
 
 @media (max-width: 768px) {
   .page-header {
-    padding: 30px 5%;
+    padding: 28px 0;
   }
 
   .header-content {
@@ -1250,57 +1439,69 @@ export default {
     align-items: flex-start;
   }
 
-  .header-title i {
-    font-size: 36px;
+  .icon-wrapper {
+    width: 56px;
+    height: 56px;
+    font-size: 26px;
   }
 
-  .header-title h1 {
+  .header-text h1 {
     font-size: 24px;
   }
 
-  .order-info-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-picker-wrapper {
+    justify-content: space-between;
+  }
+
+  .date-input {
+    flex: 1;
+  }
+
+  .order-meta {
+    flex-direction: column;
+    gap: 12px;
   }
 
   .progress-steps {
     flex-wrap: wrap;
   }
 
-  .step-dot {
-    width: 32px;
-    height: 32px;
+  .alert-content {
+    flex-wrap: wrap;
   }
 
-  .step-label {
-    font-size: 10px;
-  }
-
-  .order-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .time-left {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
   }
 }
 
 @media (max-width: 480px) {
-  .orders-container {
-    padding: 20px 3%;
+  .container {
+    padding: 0 12px;
   }
 
+  .filters-card,
   .order-card {
-    border-radius: 16px;
+    border-radius: 12px;
   }
 
-  .total-amount {
-    font-size: 18px;
+  .btn {
+    width: 100%;
+  }
+
+  .alert-actions {
+    flex-direction: column;
   }
 
   .empty-icon {
     font-size: 80px;
-  }
-
-  .empty-state h2 {
-    font-size: 22px;
   }
 }
 </style>
