@@ -1,120 +1,49 @@
 name: CD - Deploy
 
 on:
-  schedule:
-    - cron: "0 2 * * *" # Daily 2AM UTC
   workflow_dispatch:
-    inputs:
-      backup_name:
-        description: "Custom backup name"
-        required: false
-        default: "manual-backup"
 
 jobs:
-  backup:
-    name: Backup MySQL Database
+  deploy-info:
+    name: Deployment Information
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout
         uses: actions/checkout@v3
 
-      - name: 🏷️ Set backup filename
-        id: backup-info
-        run: |
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          if [ "${{ github.event.inputs.backup_name }}" != "" ]; then
-            BACKUP_NAME="${{ github.event.inputs.backup_name }}_${TIMESTAMP}"
-          else
-            BACKUP_NAME="pdq_restaurant_${TIMESTAMP}"
-          fi
-          echo "filename=${BACKUP_NAME}.sql" >> $GITHUB_OUTPUT
-          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
-
-      - name: 📦 Install MySQL Client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
-
-      - name: 💾 Create Database Backup
-        run: |
-          echo "🔄 Connecting to database..."
-          echo "Host: ${{ secrets.DB_HOST || 'localhost' }}"
-          echo "Port: ${{ secrets.DB_PORT || '3306' }}"
-          echo "User: ${{ secrets.DB_USER || 'root' }}"
-
-          mysqldump \
-            --host="${{ secrets.DB_HOST || 'localhost' }}" \
-            --port="${{ secrets.DB_PORT || '3306' }}" \
-            --user="${{ secrets.DB_USER || 'root' }}" \
-            --password="${{ secrets.DB_PASSWORD }}" \
-            --databases pdq_restaurant \
-            --add-drop-database \
-            --routines \
-            --triggers \
-            --events \
-            --single-transaction \
-            --quick \
-            --lock-tables=false \
-            > ${{ steps.backup-info.outputs.filename }} || {
-              echo "❌ Backup failed!"
-              echo "Please check:"
-              echo "1. DB_HOST, DB_PORT, DB_USER, DB_PASSWORD secrets are set"
-              echo "2. Database is accessible from GitHub Actions"
-              echo "3. Database name 'pdq_restaurant' is correct"
-              exit 1
-            }
-
-          echo "✅ Backup created successfully!"
-          ls -lh ${{ steps.backup-info.outputs.filename }}
-
-      - name: 🗜️ Compress backup
-        run: |
-          gzip ${{ steps.backup-info.outputs.filename }}
-          echo "✅ Backup compressed: ${{ steps.backup-info.outputs.filename }}.gz"
-          ls -lh ${{ steps.backup-info.outputs.filename }}.gz
-
-      - name: 📤 Upload to GitHub Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: database-backup-${{ steps.backup-info.outputs.timestamp }}
-          path: ${{ steps.backup-info.outputs.filename }}.gz
-          retention-days: 30
-
-      - name: ✅ Backup Summary
-        if: success()
+      - name: ℹ️ Deployment Info
         run: |
           echo "=========================================="
-          echo "✅ Database Backup Successful"
+          echo "🚀 CD - Deploy Workflow"
           echo "=========================================="
           echo ""
-          echo "📦 Backup file: ${{ steps.backup-info.outputs.filename }}.gz"
-          echo "⏰ Timestamp: ${{ steps.backup-info.outputs.timestamp }}"
-          echo "📥 Download: Go to Actions → This workflow run → Artifacts"
+          echo "✅ Manual deployment mode enabled"
           echo ""
-          echo "Retention: 30 days"
-          echo "=========================================="
-
-      - name: ❌ Backup Failed
-        if: failure()
-        run: |
-          echo "=========================================="
-          echo "❌ Database Backup Failed"
-          echo "=========================================="
+          echo "📍 Current Setup:"
+          echo "   • Environment: Development"
+          echo "   • Deployment: Manual trigger only"
+          echo "   • Auto-deploy: Disabled"
           echo ""
-          echo "Troubleshooting:"
-          echo "1. Check GitHub Secrets:"
-          echo "   - DB_HOST (default: localhost)"
-          echo "   - DB_PORT (default: 3306)"
-          echo "   - DB_USER (default: root)"
-          echo "   - DB_PASSWORD (REQUIRED)"
+          echo "🔧 To enable automatic deployment:"
+          echo "   1. Setup production server"
+          echo "   2. Add deployment credentials to GitHub Secrets:"
+          echo "      - SERVER_HOST"
+          echo "      - SERVER_USER"
+          echo "      - SERVER_SSH_KEY"
+          echo "      - DOCKER_USERNAME"
+          echo "      - DOCKER_PASSWORD"
           echo ""
-          echo "2. Verify database is accessible"
-          echo "3. Check database name: pdq_restaurant"
+          echo "   3. Update this workflow with:"
+          echo "      - Docker build & push steps"
+          echo "      - SSH deployment commands"
+          echo "      - Health checks"
           echo ""
-          echo "Current values (masked):"
-          echo "Host: ${{ secrets.DB_HOST || 'localhost' }}"
-          echo "Port: ${{ secrets.DB_PORT || '3306' }}"
-          echo "User: ${{ secrets.DB_USER || 'root' }}"
-          echo "Password: ${{ secrets.DB_PASSWORD != '' && '✓ Set' || '✗ NOT SET' }}"
+          echo "📦 For now, use local Docker setup:"
+          echo "   cd docker"
+          echo "   docker-compose up -d"
+          echo ""
           echo "=========================================="
+          echo "Status: Development Mode"
+          echo "=========================================="
+s
