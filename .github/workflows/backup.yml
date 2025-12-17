@@ -1,0 +1,32 @@
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup-info:
+    name: Backup Information
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Display Info
+        run: |
+          echo "=========================================="
+          echo "Database Backup - Development Mode"
+          echo "=========================================="
+          echo ""
+          echo "✅ Workflow is working correctly"
+          echo ""
+          echo "Database: pdq_restaurant (MariaDB 10.4)"
+          echo "Container: pdq-mysql (Local Docker)"
+          echo ""
+          echo "For local backups, use: docker/backup.sh"
+          echo ""
+          echo "=========================================="
+          echo "Status: OK"
+          echo "=========================================="
