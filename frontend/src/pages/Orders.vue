@@ -47,8 +47,14 @@
 
         <div class="order-footer">
           <div class="order-total">
-            <span>Tổng cộng:</span>
-            <strong>{{ formatPrice(order.totalAmount) }}đ</strong>
+            <div class="total-row">
+              <span>Phí ship:</span>
+              <span>{{ formatPrice(getShipping(order)) }}đ</span>
+            </div>
+            <div class="total-row">
+              <span>Tổng cộng:</span>
+              <strong>{{ formatPrice(order.totalAmount) }}đ</strong>
+            </div>
           </div>
           <div class="order-actions">
             <div
@@ -242,6 +248,18 @@ export default {
       return new Intl.NumberFormat("vi-VN").format(value);
     },
 
+    getShipping(order) {
+      const candidates = [
+        order?.shippingFee,
+        order?.deliveryFee,
+        order?.shippingCost,
+        order?.feeShip,
+        order?.feeShipping,
+      ].map((v) => Number(v));
+      const found = candidates.find((v) => !Number.isNaN(v));
+      return found || 0;
+    },
+
     getProductImage(url) {
       if (!url) return "/images/notfound.png";
       if (url.startsWith("http")) return url;
@@ -402,6 +420,8 @@ export default {
 .item-info p { margin: 0; color: #6b7280; font-size: 0.875rem; }
 .item-price { font-weight: 700; color: #00b067; }
 .order-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+.order-total { display: flex; flex-direction: column; gap: 0.25rem; }
+.total-row { display: flex; gap: 0.5rem; align-items: baseline; }
 .order-total strong { font-size: 1.25rem; color: #00b067; }
 .order-actions { display: flex; gap: 0.5rem; }
 .btn { padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: all 0.2s; }

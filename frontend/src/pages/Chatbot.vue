@@ -328,13 +328,13 @@ export default {
 
 .header-info h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: 700;
 }
 
 .status {
   margin: 0.2rem 0 0 0;
-  font-size: 0.75rem;
+  font-size: 0.95rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -421,7 +421,7 @@ export default {
 
 .message-bubble p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   line-height: 1.5;
 }
 
@@ -431,13 +431,13 @@ export default {
 }
 
 .message-bubble li {
-  font-size: 0.85rem;
+  font-size: 1rem;
   margin: 0.3rem 0;
 }
 
 .message-time {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   opacity: 0.6;
   margin-top: 0.3rem;
 }
@@ -494,7 +494,7 @@ export default {
   border-radius: 16px;
   background: white;
   color: #555;
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -520,7 +520,7 @@ export default {
   padding: 0.8rem;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-family: inherit;
   resize: none;
   max-height: 100px;
@@ -568,7 +568,7 @@ export default {
   padding: 0.6rem 1rem;
   background: #f9fafb;
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   color: #9ca3af;
   border-top: 1px solid #e5e7eb;
 }

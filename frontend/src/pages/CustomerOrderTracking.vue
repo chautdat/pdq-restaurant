@@ -49,6 +49,10 @@
                 <strong>{{ formatCurrency(order?.finalAmount) }}</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
+                <span>Phí ship</span>
+                <strong>{{ formatCurrency(order?.shippingFee) }}</strong>
+              </div>
+              <div class="d-flex justify-space-between mb-2">
                 <span>Phương thức</span>
                 <strong>{{ order?.paymentMethod || 'N/A' }}</strong>
               </div>

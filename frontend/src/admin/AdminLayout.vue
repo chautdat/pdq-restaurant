@@ -156,6 +156,23 @@
 
         <v-divider class="my-3"></v-divider>
 
+        <!-- Promotions Section -->
+        <v-list-subheader v-if="!rail" class="menu-section-title">
+          PROMOTIONS
+        </v-list-subheader>
+
+        <v-list-item
+          :to="{ name: 'AdminPromoCodes' }"
+          prepend-icon="mdi-tag-multiple"
+          title="Promo Codes"
+          value="promo-codes"
+          color="primary"
+          rounded="lg"
+          class="menu-item mb-1"
+        ></v-list-item>
+
+        <v-divider class="my-3"></v-divider>
+
         <!-- System Section -->
         <v-list-subheader v-if="!rail" class="menu-section-title">
           SYSTEM
@@ -457,6 +474,7 @@ export default {
         AdminUsers: "User Management",
         AdminSales: "Sales Report",
         AdminEarnings: "Revenue & Earnings",
+        AdminPromoCodes: "Promotional Code Management",
       };
       return titles[name] || "Admin Panel";
     });

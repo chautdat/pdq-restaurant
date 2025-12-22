@@ -30,17 +30,20 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final ApplicationEventPublisher eventPublisher;
+    private final PromoCodeService promoCodeService;
 
     public AuthService(UserRepository userRepository,
                       PasswordEncoder passwordEncoder,
                       JwtService jwtService,
                       AuthenticationManager authenticationManager,
-                      ApplicationEventPublisher eventPublisher) {
+                      ApplicationEventPublisher eventPublisher,
+                      PromoCodeService promoCodeService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
         this.eventPublisher = eventPublisher;
+        this.promoCodeService = promoCodeService;
     }
 
     // ✅ ĐĂNG KÝ - ĐÃ FIX
@@ -68,6 +71,14 @@ public class AuthService {
         user.setEmailVerifiedAt(LocalDateTime.now()); // Auto verify
 
         userRepository.save(user);
+
+        // 🎁 Generate signup promo code (50% shipping discount, single use, 30-day validity)
+        try {
+            promoCodeService.generateSignupPromoCode(user);
+        } catch (Exception e) {
+            System.err.println("⚠️ Generate signup promo code failed: " + e.getMessage());
+            // Don't fail registration if promo generation fails
+        }
 
         // Generate token
         String token = jwtService.generateToken(user);

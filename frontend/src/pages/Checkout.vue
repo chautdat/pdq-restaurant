@@ -68,6 +68,16 @@
               }}</span>
             </div>
 
+            <div
+              v-if="distance !== null && distance !== undefined"
+              class="price-row distance-info"
+            >
+              <span class="label">
+                <span class="distance-icon">📍</span>
+                Khoảng cách: {{ distance.toFixed(2) }} km
+              </span>
+            </div>
+
             <div class="price-row">
               <span class="label">Phí giao hàng</span>
               <span class="value">
@@ -132,6 +142,8 @@
             <div v-if="voucherApplied" class="voucher-applied">
               <span class="check-icon">✓</span>
               Đã áp dụng mã <strong>{{ voucherCode }}</strong>
+              <span v-if="promoFreeShipping"> (Miễn phí vận chuyển)</span>
+              <span v-else> (-{{ formatVND(discount) }})</span>
             </div>
           </div>
         </div>
@@ -188,6 +200,55 @@
                 @update:ward="checkoutObj.ward = $event"
                 @address-selected="onAddressSelected"
               />
+
+              <!-- Địa chỉ giao hàng (Google Places Autocomplete) -->
+              <div class="form-group">
+                <label class="form-label">Địa chỉ giao hàng *</label>
+                <input
+                  ref="addressInput"
+                  type="text"
+                  v-model="checkoutObj.addressLine"
+                  class="form-input"
+                  placeholder="Nhập địa chỉ giao hàng..."
+                  @input="onAddressInput"
+                  required
+                />
+                <div v-if="addressSuggestions.length" class="suggestions">
+                  <div
+                    v-for="item in addressSuggestions"
+                    :key="item.properties?.osm_id || item.properties?.name"
+                    class="suggestion-item"
+                    @click="selectSuggestion(item)"
+                  >
+                    <div class="suggestion-title">
+                      {{ item.properties?.name || item.properties?.street }}
+                    </div>
+                    <div class="suggestion-sub">
+                      {{
+                        item.properties?.city || item.properties?.state || ""
+                      }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Geo locate button -->
+              <div class="geo-row">
+                <button
+                  type="button"
+                  class="btn-geo"
+                  @click="useCurrentLocation"
+                >
+                  <i class="fas fa-location-arrow"></i>
+                  Lấy vị trí hiện tại
+                </button>
+                <span class="geo-hint"
+                  >Sử dụng GPS để tự động điền địa chỉ</span
+                >
+              </div>
+
+              <!-- Map preview -->
+              <div id="checkout-map" class="checkout-map"></div>
             </div>
           </div>
 
@@ -362,6 +423,8 @@ export default {
         city: "",
         district: "",
         ward: "",
+        deliveryLat: null,
+        deliveryLng: null,
         paymentMethod: "cash",
       },
 
@@ -369,7 +432,7 @@ export default {
       voucherApplied: false,
       applyingVoucher: false,
       discount: 0,
-      voucherId: null,
+      promoFreeShipping: false,
       errorObj: {
         nameErr: [],
         phoneErr: [],
@@ -388,9 +451,17 @@ export default {
         totalItems: 0,
         totalPrice: 0,
       },
+      addressSuggestions: [],
+      addressSearchTimer: null,
+      addressLoading: false,
+      leafletLoaded: false,
+      map: null,
+      mapMarker: null,
       isSubmitting: false,
       successMessage: "",
       successTimer: null,
+      distance: null,
+      calculatingDistance: false,
     };
   },
 
@@ -416,9 +487,69 @@ export default {
       this.checkoutObj.phone = this.user.phone || "";
       this.loadDefaultAddress();
     }
+
+    // Nếu đã có địa chỉ từ lần trước, đồng bộ selector + map
+    this.afterLocationUpdated();
   },
 
   methods: {
+    // ===== Autocomplete với Photon/Nominatim (OSM) =====
+    onAddressInput() {
+      this.checkoutObj.deliveryLat = null;
+      this.checkoutObj.deliveryLng = null;
+      if (this.addressSearchTimer) clearTimeout(this.addressSearchTimer);
+      const query = this.checkoutObj.addressLine || "";
+      if (!query.trim()) {
+        this.addressSuggestions = [];
+        return;
+      }
+      this.addressSearchTimer = setTimeout(() => {
+        this.fetchSuggestions(query);
+      }, 400);
+    },
+
+    async fetchSuggestions(query) {
+      try {
+        this.addressLoading = true;
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(
+          query
+        )}&lang=vi&limit=5`;
+        const res = await fetch(url);
+        const data = await res.json();
+        this.addressSuggestions = Array.isArray(data.features)
+          ? data.features
+          : [];
+      } catch (err) {
+        console.error("Autocomplete error:", err);
+      } finally {
+        this.addressLoading = false;
+      }
+    },
+
+    selectSuggestion(feature) {
+      this.addressSuggestions = [];
+      if (!feature?.geometry?.coordinates) return;
+
+      const [lon, lat] = feature.geometry.coordinates;
+      const props = feature.properties || {};
+
+      this.checkoutObj.addressLine =
+        props.name ||
+        props.street ||
+        props.label ||
+        `${props.housenumber || ""} ${props.street || ""}`.trim();
+      this.checkoutObj.deliveryLat = lat;
+      this.checkoutObj.deliveryLng = lon;
+      this.checkoutObj.city = props.city || props.state || "";
+      this.checkoutObj.district = props.county || props.district || "";
+      this.checkoutObj.ward = props.suburb || props.neighbourhood || "";
+
+      this.addressErrors = { city: "", district: "", ward: "", detail: "" };
+      this.errorObj.addressErr = [];
+      this.afterLocationUpdated();
+      this.onLocationUpdated();
+    },
+
     normalizeAddress(address = {}) {
       return {
         recipientName:
@@ -460,11 +591,33 @@ export default {
         const token = storage.getToken();
         if (!token) return;
 
-        const res = await api.get("/addresses/default", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Ưu tiên gọi /addresses/default, nếu 404 thì fallback sang /addresses
+        let raw = null;
+        try {
+          const res = await api.get("/addresses/default", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          raw = res.data?.data;
+        } catch (e) {
+          console.warn("Default address 404, fallback to /addresses");
+          try {
+            const listRes = await api.get("/addresses", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = listRes.data?.data;
+            const arr = Array.isArray(data)
+              ? data
+              : data?.content && Array.isArray(data.content)
+              ? data.content
+              : [];
+            raw =
+              arr.find((a) => a.isDefault || a.default || a.defaultAddress) ||
+              arr[0];
+          } catch (e2) {
+            console.warn("Fallback /addresses failed:", e2?.response || e2);
+          }
+        }
 
-        const raw = res.data?.data;
         if (!raw) return;
 
         const addr = this.normalizeAddress(raw);
@@ -479,6 +632,12 @@ export default {
         this.checkoutObj.ward = addr.ward || "";
 
         console.log("✅ Loaded default address:", addr);
+
+        // Geocode nếu có addressLine để lấy lat/lng + fill selector/map
+        if (this.checkoutObj.addressLine) {
+          await this.ensureGeocode();
+        }
+        this.afterLocationUpdated();
       } catch (err) {
         console.warn(
           "Không tìm thấy địa chỉ mặc định:",
@@ -499,6 +658,8 @@ export default {
       this.checkoutObj.city = address.city || "";
       this.checkoutObj.district = address.district || "";
       this.checkoutObj.ward = address.ward || "";
+      this.checkoutObj.deliveryLat = address.deliveryLat || null;
+      this.checkoutObj.deliveryLng = address.deliveryLng || null;
 
       // ✅ XÓA LỖI VALIDATION
       this.addressErrors = {
@@ -509,6 +670,250 @@ export default {
       };
 
       console.log("✅ Checkout data updated:", this.checkoutObj);
+      // Geocode nếu chưa có tọa độ
+      if (!this.checkoutObj.deliveryLat || !this.checkoutObj.deliveryLng) {
+        this.geocodeAddress(this.checkoutObj.addressLine);
+      } else {
+        this.onLocationUpdated();
+      }
+    },
+
+    async geocodeAddress(address) {
+      if (!address) return false;
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=vi&q=${encodeURIComponent(
+          address
+        )}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length) {
+          const first = data[0];
+          this.checkoutObj.deliveryLat = parseFloat(first.lat);
+          this.checkoutObj.deliveryLng = parseFloat(first.lon);
+          if (!this.checkoutObj.addressLine) {
+            this.checkoutObj.addressLine = first.display_name;
+          }
+          this.setAddressFromNominatim(first.address || {}, first.display_name);
+          this.afterLocationUpdated();
+          this.onLocationUpdated();
+          return true;
+        }
+        console.warn("Geocode failed");
+        return false;
+      } catch (err) {
+        console.error("Geocode error:", err);
+        return false;
+      }
+    },
+
+    async reverseGeocode(lat, lng) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=vi&lat=${lat}&lon=${lng}&addressdetails=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data?.address) {
+          this.setAddressFromNominatim(data.address, data.display_name);
+          return data.display_name;
+        }
+        console.warn("Reverse geocode failed");
+        return null;
+      } catch (err) {
+        console.error("Reverse geocode error:", err);
+        return null;
+      }
+    },
+
+    setAddressFromNominatim(addr = {}, displayName = "") {
+      const firstNonEmpty = (...args) => args.find((v) => v && v.length);
+
+      // Ward / Phường
+      this.checkoutObj.ward =
+        firstNonEmpty(
+          addr.suburb,
+          addr.neighbourhood,
+          addr.quarter,
+          addr.hamlet,
+          addr.village,
+          addr.town,
+          addr.city_block,
+          addr.residential,
+          addr.ward
+        ) || "";
+
+      // District / Quận-Huyện
+      this.checkoutObj.district =
+        firstNonEmpty(
+          addr.city_district,
+          addr.county,
+          addr.district,
+          addr.borough,
+          addr.suburb,
+          addr.municipality,
+          addr.region,
+          addr.city,
+          addr.town
+        ) || "";
+
+      // City / Tỉnh-Thành
+      this.checkoutObj.city =
+        firstNonEmpty(
+          addr.state,
+          addr.province,
+          addr.region,
+          addr.city,
+          addr.town,
+          addr.state_district
+        ) || "";
+
+      // Fallback: parse display_name nếu có
+      const display = addr.display_name || displayName || "";
+      if (display) {
+        const parts = display.split(",").map((p) => p.trim());
+        if (parts.length >= 3) {
+          if (!this.checkoutObj.ward) {
+            this.checkoutObj.ward = parts[parts.length - 4] || "";
+          }
+          if (!this.checkoutObj.district) {
+            this.checkoutObj.district = parts[parts.length - 3] || "";
+          }
+          if (!this.checkoutObj.city) {
+            this.checkoutObj.city = parts[parts.length - 2] || "";
+          }
+        }
+      }
+
+      // ✅ TỰ ĐỘNG SYNC VÀO ADDRESSSELECTOR
+      this.afterLocationUpdated();
+    },
+
+    async useCurrentLocation() {
+      if (!navigator.geolocation) {
+        Swal.fire(
+          "Thiếu quyền",
+          "Trình duyệt không hỗ trợ định vị.",
+          "warning"
+        );
+        return;
+      }
+      Swal.fire({
+        title: "Đang lấy vị trí...",
+        didOpen: () => Swal.showLoading(),
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+      });
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          Swal.close();
+          const { latitude, longitude } = pos.coords;
+          this.checkoutObj.deliveryLat = latitude;
+          this.checkoutObj.deliveryLng = longitude;
+          const formatted = await this.reverseGeocode(latitude, longitude);
+          if (formatted) {
+            this.checkoutObj.addressLine = formatted;
+          }
+          // Xóa lỗi
+          this.errorObj.addressErr = [];
+          this.addressErrors = { city: "", district: "", ward: "", detail: "" };
+          console.log("📍 Got geolocation:", latitude, longitude, formatted);
+          this.afterLocationUpdated();
+          this.onLocationUpdated();
+        },
+        (err) => {
+          Swal.close();
+          Swal.fire(
+            "Không lấy được vị trí",
+            "Vui lòng bật GPS/quyền định vị hoặc nhập địa chỉ thủ công.",
+            "warning"
+          );
+          console.error("Geolocation error:", err);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    },
+
+    async ensureGeocode() {
+      if (this.checkoutObj.deliveryLat && this.checkoutObj.deliveryLng) {
+        return true;
+      }
+      return await this.geocodeAddress(this.checkoutObj.addressLine);
+    },
+
+    syncAddressSelectorFromState() {
+      const ref = this.$refs.addressSelector;
+      if (!ref || typeof ref.applyExternalAddress !== "function") return;
+      ref.applyExternalAddress({
+        city: this.checkoutObj.city,
+        district: this.checkoutObj.district,
+        ward: this.checkoutObj.ward,
+        addressLine: this.checkoutObj.addressLine,
+      });
+    },
+
+    afterLocationUpdated() {
+      this.syncAddressSelectorFromState();
+      this.updateMap();
+    },
+
+    async ensureLeaflet() {
+      if (this.leafletLoaded || window.L) return true;
+
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject();
+        document.body.appendChild(script);
+      });
+      this.leafletLoaded = true;
+      return true;
+    },
+
+    async updateMap() {
+      if (
+        !this.checkoutObj.deliveryLat ||
+        !this.checkoutObj.deliveryLng ||
+        Number.isNaN(this.checkoutObj.deliveryLat) ||
+        Number.isNaN(this.checkoutObj.deliveryLng)
+      ) {
+        return;
+      }
+      try {
+        await this.ensureLeaflet();
+        const L = window.L;
+        const latlng = [
+          Number(this.checkoutObj.deliveryLat),
+          Number(this.checkoutObj.deliveryLng),
+        ];
+
+        if (!this.map) {
+          this.map = L.map("checkout-map", {
+            center: latlng,
+            zoom: 15,
+            zoomControl: true,
+          });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: "© OpenStreetMap",
+          }).addTo(this.map);
+          this.mapMarker = L.marker(latlng).addTo(this.map);
+        } else {
+          this.map.setView(latlng, 15);
+          if (this.mapMarker) {
+            this.mapMarker.setLatLng(latlng);
+          } else {
+            this.mapMarker = L.marker(latlng).addTo(this.map);
+          }
+        }
+      } catch (err) {
+        console.error("Map update error:", err);
+      }
     },
 
     async loadCart() {
@@ -583,9 +988,34 @@ export default {
     },
 
     calculateSummary() {
+      // Restaurant coordinates (Nhà hàng)
+      const RESTAURANT_LAT = 10.855232;
+      const RESTAURANT_LNG = 106.78578;
+
       let deliveryFee = 15000;
 
+      // Calculate distance-based fee if coordinates are available
+      if (
+        this.checkoutObj.deliveryLat &&
+        this.checkoutObj.deliveryLng &&
+        this.distance === null
+      ) {
+        // Calculate distance using Haversine formula
+        this.distance = this.haversineDistance(
+          RESTAURANT_LAT,
+          RESTAURANT_LNG,
+          this.checkoutObj.deliveryLat,
+          this.checkoutObj.deliveryLng
+        );
+      }
+
+      // Apply distance-based shipping fee
+      if (this.distance !== null && this.distance !== undefined) {
+        deliveryFee = this.calculateShippingFee(this.distance);
+      }
+
       if (this.cartSummary.totalPrice > 200000) deliveryFee = 0;
+      if (this.promoFreeShipping) deliveryFee = 0;
       if (this.cart.length === 0) deliveryFee = 0;
 
       const finalTotal = Math.max(
@@ -600,31 +1030,66 @@ export default {
       };
     },
 
+    // Haversine formula to calculate distance between two coordinates
+    haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Earth's radius in km
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // Distance in km
+    },
+
+    // Calculate shipping fee based on distance (matching backend logic)
+    calculateShippingFee(distanceKm) {
+      const BASE_FEE = 15000; // 15k for ≤3km
+      const EXTRA_PER_KM = 5000; // 5k per km after 3km
+
+      if (distanceKm <= 3) {
+        return BASE_FEE;
+      }
+
+      const extra = (distanceKm - 3) * EXTRA_PER_KM;
+      const total = BASE_FEE + extra;
+      // Round to nearest 5000
+      return Math.round(total / 5000) * 5000;
+    },
+
+    // Trigger distance calculation after location updates
+    onLocationUpdated() {
+      if (this.checkoutObj.deliveryLat && this.checkoutObj.deliveryLng) {
+        // Reset cached distance to force recalculation
+        this.distance = null;
+        // Trigger reactive update
+        this.$forceUpdate();
+      }
+    },
+
     async applyVoucher() {
       if (!this.voucherCode) return;
       this.applyingVoucher = true;
       try {
-        const token = storage.getToken();
-        const res = await api.post(
-          "/vouchers/apply",
-          {
-            code: this.voucherCode,
-            orderAmount: this.cartSummary.totalPrice,
-          },
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : undefined,
-            },
-          }
-        );
+        const res = await api.post("/promo-codes/validate", {
+          code: this.voucherCode,
+          orderAmount: this.cartSummary.totalPrice,
+        });
         const data = res.data?.data;
-        this.discount = data?.discountAmount || 0;
-        this.voucherId = data?.id || null;
+        this.discount = Number(data?.discountAmount || 0);
+        this.promoFreeShipping = Boolean(data?.freeShipping);
         this.voucherApplied = true;
+
+        const message = this.promoFreeShipping
+          ? "Miễn phí vận chuyển"
+          : `Giảm ${this.formatVND(this.discount)}`;
         await Swal.fire({
           icon: "success",
-          title: "Đã áp dụng mã",
-          text: `Giảm ${this.formatVND(this.discount)}`,
+          title: "Áp dụng mã thành công",
+          text: message,
           timer: 1400,
           showConfirmButton: false,
         });
@@ -643,7 +1108,7 @@ export default {
       this.voucherCode = "";
       this.voucherApplied = false;
       this.discount = 0;
-      this.voucherId = null;
+      this.promoFreeShipping = false;
     },
 
     validateForm() {
@@ -670,13 +1135,12 @@ export default {
         this.errorObj.phoneErr.push("Số điện thoại không hợp lệ!");
 
       const addressValidation = this.$refs.addressSelector.validate();
-      this.addressErrors =
-        addressValidation.errors || {
-          city: "",
-          district: "",
-          ward: "",
-          detail: "",
-        };
+      this.addressErrors = addressValidation.errors || {
+        city: "",
+        district: "",
+        ward: "",
+        detail: "",
+      };
 
       // Nếu đã chọn địa chỉ đã lưu, bỏ qua lỗi địa chỉ
       if (addressValidation.isValid) {
@@ -714,6 +1178,17 @@ export default {
         return;
       }
 
+      const hasGeo = await this.ensureGeocode();
+      if (!hasGeo) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Chưa lấy được tọa độ",
+          text: "Vui lòng chọn địa chỉ rõ ràng hơn hoặc thử lại.",
+          confirmButtonColor: "#00b067",
+        });
+        return;
+      }
+
       if (this.cart.length === 0) {
         await Swal.fire({
           icon: "info",
@@ -734,8 +1209,13 @@ export default {
             recipientName: this.checkoutObj.recipientName,
             phone: this.checkoutObj.phone,
             addressLine: this.checkoutObj.addressLine,
+            deliveryLat: this.checkoutObj.deliveryLat,
+            deliveryLng: this.checkoutObj.deliveryLng,
             paymentMethod: this.checkoutObj.paymentMethod,
-            voucherId: this.voucherId,
+            promoCode:
+              this.voucherApplied && this.voucherCode
+                ? this.voucherCode
+                : null,
           },
           {
             headers: {
@@ -1068,6 +1548,25 @@ export default {
   font-weight: 600;
 }
 
+.price-row.distance-info {
+  background: #f0fdf4;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+}
+
+.price-row.distance-info .label {
+  color: #059669;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.distance-icon {
+  font-size: 1.1rem;
+}
+
 .price-row.discount {
   color: #10b981;
 }
@@ -1210,6 +1709,75 @@ export default {
   justify-content: center;
   font-size: 0.75rem;
   font-weight: bold;
+}
+
+.geo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.btn-geo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-geo:hover {
+  border-color: #00b067;
+  color: #00b067;
+}
+
+.geo-hint {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.checkout-map {
+  width: 100%;
+  height: 240px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-top: 12px;
+}
+
+/* Autocomplete suggestions */
+.suggestions {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  margin-top: 6px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background: #f3f4f6;
+}
+
+.suggestion-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.suggestion-sub {
+  font-size: 13px;
+  color: #6b7280;
 }
 
 /* ========================================

@@ -1,378 +1,534 @@
 <template>
-  <div class="orders-page">
-    <!-- ⚠️ ERROR BANNER -->
-    <div v-if="errorMsg" class="error-banner">
-      <strong>⚠️ Lỗi:</strong> {{ errorMsg }}
-      <button @click="errorMsg = ''" class="close-error">✕</button>
-    </div>
-
+  <div class="menu-management">
     <!-- Header Section -->
-    <div class="header-section">
+    <div class="page-header">
       <div class="header-content">
-        <h2 class="page-title">📦 Quản Lý Đơn Hàng</h2>
-        <p class="page-subtitle">
-          Quản lý và theo dõi tất cả đơn hàng khách hàng
-        </p>
-      </div>
-      <div class="stats-cards">
-        <div class="stat-card">
-          <div class="stat-icon">📊</div>
-          <div class="stat-info">
-            <span class="stat-number">{{ orders.length }}</span>
-            <span class="stat-label">Tổng đơn (trang hiện tại)</span>
-          </div>
+        <div class="title-section">
+          <h1>
+            <span class="icon">🍽️</span>
+            Quản Lý Thực Đơn
+          </h1>
+          <p class="subtitle">Quản lý món ăn và danh mục của nhà hàng</p>
         </div>
-        <div class="stat-card paid">
-          <div class="stat-icon">✅</div>
-          <div class="stat-info">
-            <span class="stat-number">{{ paidCount }}</span>
-            <span class="stat-label">Đã thanh toán</span>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+          <div class="stat-item blue">
+            <div class="stat-icon">📊</div>
+            <div class="stat-content">
+              <div class="stat-value">{{ products.length }}</div>
+              <div class="stat-label">Tổng Món</div>
+            </div>
           </div>
-        </div>
-        <div class="stat-card unpaid">
-          <div class="stat-icon">⏳</div>
-          <div class="stat-info">
-            <span class="stat-number">{{ unpaidCount }}</span>
-            <span class="stat-label">Chờ thanh toán</span>
+
+          <div class="stat-item green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-content">
+              <div class="stat-value">{{ availableCount }}</div>
+              <div class="stat-label">Còn Hàng</div>
+            </div>
+          </div>
+
+          <div class="stat-item orange">
+            <div class="stat-icon">❌</div>
+            <div class="stat-content">
+              <div class="stat-value">{{ unavailableCount }}</div>
+              <div class="stat-label">Hết Hàng</div>
+            </div>
+          </div>
+
+          <div class="stat-item purple">
+            <div class="stat-icon">📁</div>
+            <div class="stat-content">
+              <div class="stat-value">{{ categories.length }}</div>
+              <div class="stat-label">Danh Mục</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Table Section -->
-    <div class="table-section">
-      <div class="table-header">
-        <div class="table-title-block">
-          <h3>📋 Danh Sách Đơn Hàng</h3>
-          <p class="table-subtitle">
-            Theo dõi nhanh trạng thái & thanh toán từng đơn
-          </p>
-        </div>
-
-        <div class="header-actions">
-          <div class="date-range">
-            <div class="date-field">
-              <label for="startDate">📅 From:</label>
-              <input
-                id="startDate"
-                type="date"
-                v-model="startDate"
-                @change="onFilterChange"
-              />
-            </div>
-            <div class="date-field">
-              <label for="endDate">📅 To:</label>
-              <input
-                id="endDate"
-                type="date"
-                v-model="endDate"
-                @change="onFilterChange"
-              />
-            </div>
-            <div class="quick-range">
-              <button class="btn-quick" @click="setRange('today')">
-                Today
-              </button>
-              <button class="btn-quick" @click="setRange('week')">
-                This Week
-              </button>
-              <button class="btn-quick" @click="setRange('month')">
-                This Month
-              </button>
-              <button class="btn-quick" @click="setRange('all')">
-                All Time
-              </button>
-            </div>
-          </div>
-
-          <!-- Filter theo status -->
-          <div class="filter-group">
-            <label for="statusFilter">Trạng thái:</label>
-            <select
-              id="statusFilter"
-              class="filter-select"
-              v-model="statusFilter"
-              @change="onFilterChange"
-            >
-              <option value="">Tất cả</option>
-              <option
-                v-for="opt in statusOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-
-          <button class="btn-refresh" @click="fetchOrders" :disabled="loading">
-            {{ loading ? "⏳" : "🔄" }} Làm mới
-          </button>
-        </div>
+    <!-- Alert Messages -->
+    <transition name="slide-fade">
+      <div v-if="errorMsg" class="alert alert-error">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-message">{{ errorMsg }}</span>
+        <button class="alert-close" @click="errorMsg = ''">✕</button>
       </div>
+    </transition>
 
-      <div class="table-container cards-container">
-        <!-- Loading / Empty -->
-        <div v-if="loading" class="loading-cell">
-          <div class="loading-spinner"></div>
-          <span>Đang tải đơn hàng...</span>
-        </div>
-        <div v-else-if="!orders.length" class="empty-cell card">
-          <div class="empty-icon">📭</div>
-          <span>Không có đơn hàng nào.</span>
-        </div>
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Left Side - Form -->
+      <div class="form-section">
+        <div class="form-card">
+          <div class="form-header">
+            <h2>
+              <span class="icon">{{ editing ? "✏️" : "➕" }}</span>
+              {{ editing ? "Chỉnh Sửa Món Ăn" : "Thêm Món Ăn Mới" }}
+            </h2>
+            <span v-if="editing" class="editing-badge">Đang chỉnh sửa</span>
+          </div>
 
-        <!-- Cards -->
-        <div v-else class="orders-grid">
-          <div v-for="order in orders" :key="order.orderId" class="order-card">
-            <div class="order-card__top">
-              <div class="order-code">
-                <span class="order-short">
-                  {{
-                    order.shortCode ||
-                    (order.orderNumber || "ORD").slice(-6).toUpperCase()
-                  }}
-                </span>
-                <span class="order-id">Mã dài: {{ order.orderNumber }}</span>
-              </div>
-              <div class="order-total">{{ formatPrice(getTotal(order)) }}</div>
+          <form @submit.prevent="saveProduct" class="form-body">
+            <!-- Product Name -->
+            <div class="form-group">
+              <label class="form-label">
+                <span class="label-text">Tên Món Ăn</span>
+                <span class="required">*</span>
+              </label>
+              <input
+                v-model="product.productName"
+                type="text"
+                class="form-input"
+                placeholder="Vd: Phở Bò, Cơm Gà Xối Mỡ..."
+                required
+              />
             </div>
 
-            <div class="order-meta">
-              <div class="meta-item">
-                <span class="meta-label">Người nhận</span>
-                <span class="meta-value">{{ order.recipientName }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">SĐT</span>
-                <span class="meta-value">{{ order.phone }}</span>
-              </div>
-              <div class="meta-item full">
-                <span class="meta-label">Địa chỉ</span>
-                <span class="meta-value" :title="getAddress(order)">
-                  {{ getAddress(order) }}
-                </span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Ngày đặt</span>
-                <span class="meta-value">{{
-                  formatDate(order.createdAt)
-                }}</span>
-              </div>
-            </div>
-
-            <div class="order-status-row">
-              <div class="pill">
-                <span class="pill-label">Thanh toán</span>
-                <span
-                  class="pill-badge"
-                  :class="{
-                    paid: getPaymentStatus(order) === 'paid',
-                    pending: getPaymentStatus(order) === 'pending',
-                    failed: getPaymentStatus(order) === 'failed',
-                  }"
-                >
-                  {{ getPaymentStatus(order).toUpperCase() || "N/A" }}
-                </span>
-                <span class="pill-method">
-                  Phương thức: {{ getPaymentMethod(order)?.toUpperCase() }}
-                </span>
+            <!-- Price & Category -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">
+                  <span class="label-text">Giá Tiền</span>
+                  <span class="required">*</span>
+                </label>
+                <div class="input-with-addon">
+                  <input
+                    v-model="product.price"
+                    type="number"
+                    class="form-input"
+                    placeholder="50000"
+                    min="0"
+                    step="1000"
+                    required
+                  />
+                  <span class="input-addon">VNĐ</span>
+                </div>
               </div>
 
-              <div class="status-select-wrapper">
-                <label>Trạng thái đơn</label>
+              <div class="form-group">
+                <label class="form-label">
+                  <span class="label-text">Danh Mục</span>
+                  <span class="required">*</span>
+                </label>
                 <select
-                  v-model="order.orderStatus"
-                  class="status-select"
-                  :class="'status-' + normalizeStatus(order.orderStatus)"
-                  @change="markAsChanged(order)"
+                  v-model.number="product.categoryId"
+                  class="form-select"
+                  required
                 >
+                  <option value="" disabled>Chọn danh mục</option>
                   <option
-                    v-for="opt in statusOptions"
-                    :key="opt.value"
-                    :value="opt.value"
+                    v-for="cat in categories"
+                    :key="cat.categoryId"
+                    :value="cat.categoryId"
                   >
-                    {{ opt.label }}
+                    {{ cat.categoryName }}
                   </option>
                 </select>
               </div>
             </div>
 
-            <div class="action-buttons card-actions">
-              <button
-                class="btn-action btn-confirm"
-                v-if="
-                  getPaymentMethod(order) === 'cash' &&
-                  getPaymentStatus(order) === 'pending'
-                "
-                @click="confirmCash(order)"
-                :disabled="confirmingId === order.orderId"
-                title="Xác nhận thanh toán tiền mặt"
-              >
-                💵
-              </button>
-
-              <button
-                class="btn-action btn-update"
-                @click="updateStatus(order)"
-                title="Lưu thay đổi"
-                :disabled="!order._changed"
-              >
-                💾
-              </button>
-
-              <button
-                class="btn-action btn-details"
-                @click="showDetails(order)"
-                title="Xem chi tiết"
-              >
-                👁️
-              </button>
-              <button
-                class="btn-action btn-next"
-                @click="advanceStatus(order)"
-                :disabled="isTerminal(order.orderStatus)"
-                title="Chuyển trạng thái tiếp theo"
-              >
-                ⏭️
-              </button>
-
-              <button
-                class="btn-action btn-delete"
-                @click="deleteOrder(order)"
-                title="Xóa đơn hàng"
-              >
-                🗑️
-              </button>
+            <!-- Short Description -->
+            <div class="form-group">
+              <label class="form-label">
+                <span class="label-text">Mô Tả Ngắn</span>
+                <span class="optional">(không bắt buộc)</span>
+              </label>
+              <textarea
+                v-model="product.shortDescription"
+                class="form-textarea"
+                rows="2"
+                maxlength="200"
+                placeholder="Mô tả ngắn gọn về món ăn..."
+              ></textarea>
+              <div class="char-counter">
+                {{ (product.shortDescription || "").length }}/200
+              </div>
             </div>
 
-            <div v-if="getNote(order)" class="order-note">
-              <span class="note-label">Ghi chú khách:</span>
-              <span class="note-text">{{ getNote(order) }}</span>
+            <!-- Full Description -->
+            <div class="form-group">
+              <label class="form-label">
+                <span class="label-text">Mô Tả Chi Tiết</span>
+                <span class="optional">(không bắt buộc)</span>
+              </label>
+              <textarea
+                v-model="product.description"
+                class="form-textarea"
+                rows="4"
+                placeholder="Mô tả đầy đủ về nguyên liệu, hương vị, cách chế biến..."
+              ></textarea>
             </div>
-          </div>
+
+            <!-- Image Upload -->
+            <div class="form-group">
+              <label class="form-label">
+                <span class="label-text">Hình Ảnh</span>
+              </label>
+
+              <!-- Preview -->
+              <div v-if="previewUrl" class="image-preview">
+                <img :src="previewUrl" alt="Preview" class="preview-image" />
+                <button
+                  type="button"
+                  class="btn-remove-image"
+                  @click="removeImage"
+                >
+                  <span class="icon">🗑️</span>
+                  Xóa ảnh
+                </button>
+              </div>
+
+              <!-- Upload -->
+              <div v-else class="image-upload">
+                <input
+                  ref="fileInput"
+                  type="file"
+                  accept="image/*"
+                  @change="handleFileChange"
+                  style="display: none"
+                />
+                <button
+                  type="button"
+                  class="btn-upload"
+                  @click="$refs.fileInput.click()"
+                >
+                  <span class="icon">📤</span>
+                  Tải Lên Hình Ảnh
+                </button>
+                <p class="upload-hint">PNG, JPG, WEBP (Tối đa 5MB)</p>
+              </div>
+            </div>
+
+            <!-- Availability Toggle -->
+            <div class="form-group">
+              <label class="toggle-wrapper">
+                <input
+                  v-model="product.isAvailable"
+                  type="checkbox"
+                  class="toggle-input"
+                />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">
+                  {{ product.isAvailable ? "Còn hàng" : "Hết hàng" }}
+                </span>
+              </label>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                <span class="btn-icon">{{ editing ? "💾" : "➕" }}</span>
+                <span class="btn-text">
+                  {{
+                    loading ? "Đang lưu..." : editing ? "Cập Nhật" : "Thêm Món"
+                  }}
+                </span>
+              </button>
+
+              <button
+                v-if="editing"
+                type="button"
+                class="btn btn-secondary"
+                @click="cancelEdit"
+              >
+                <span class="btn-icon">🚫</span>
+                <span class="btn-text">Hủy</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="pagination">
-        <button :disabled="page === 0" @click="changePage(page - 1)">
-          « Trước
-        </button>
-        <span class="page-info">Trang {{ page + 1 }} / {{ totalPages }}</span>
-        <button
-          :disabled="page + 1 >= totalPages"
-          @click="changePage(page + 1)"
-        >
-          Sau »
-        </button>
-      </div>
-    </div>
-
-    <!-- Modal chi tiết đơn hàng -->
-    <div
-      v-if="showModal && selectedOrder"
-      class="modal-overlay"
-      @click.self="closeDetails"
-    >
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>📋 Chi Tiết Đơn Hàng</h3>
-          <button class="modal-close" @click="closeDetails">✕</button>
-        </div>
-
-        <div class="modal-body">
-          <div class="detail-row">
-            <span class="detail-label">Mã đơn:</span>
-            <span class="detail-value">#{{ selectedOrder.orderId }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Số đơn hàng:</span>
-            <span class="detail-value">{{ selectedOrder.orderNumber }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Người nhận:</span>
-            <span class="detail-value">{{ selectedOrder.recipientName }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Điện thoại:</span>
-            <span class="detail-value">{{ selectedOrder.phone }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Địa chỉ:</span>
-            <span class="detail-value">{{ getAddress(selectedOrder) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Ngày đặt:</span>
-            <span class="detail-value">
-              {{ formatDate(selectedOrder.createdAt) }}
-            </span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Tạm tính:</span>
-            <span class="detail-value">
-              {{ formatPrice(getSubtotal(selectedOrder)) }}
-            </span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Phí vận chuyển:</span>
-            <span class="detail-value">
-              {{ formatPrice(getShipping(selectedOrder) || 0) }}
-            </span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Tổng cộng:</span>
-            <span class="detail-value total">
-              {{ formatPrice(getTotal(selectedOrder)) }}
-            </span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Thanh toán:</span>
-            <span class="detail-value">
-              {{ getPaymentStatus(selectedOrder)?.toUpperCase() || "N/A" }}
-              ({{ getPaymentMethod(selectedOrder)?.toUpperCase() || "N/A" }})
-            </span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Trạng thái:</span>
-            <span class="status-badge">
-              {{ getStatusLabel(selectedOrder.orderStatus) }}
-            </span>
-          </div>
-          <div
-            v-if="getNote(selectedOrder)"
-            class="detail-row detail-note-row"
-          >
-            <span class="detail-label">Ghi chú khách:</span>
-            <span class="detail-value note-value">
-              {{ getNote(selectedOrder) }}
-            </span>
+      <!-- Right Side - Table/Cards -->
+      <div class="content-section">
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <!-- Search -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="search-input"
+              placeholder="Tìm kiếm món ăn..."
+            />
+            <button
+              v-if="searchQuery"
+              class="clear-search"
+              @click="searchQuery = ''"
+            >
+              ✕
+            </button>
           </div>
 
-          <!-- Items -->
-          <div
-            v-if="selectedOrder.items && selectedOrder.items.length"
-            class="items-section"
-          >
-            <h4>Sản phẩm:</h4>
-            <ul class="items-list">
-              <li
-                v-for="it in selectedOrder.items"
-                :key="it.orderItemId"
-                class="item-row"
+          <!-- Filters -->
+          <div class="filters">
+            <!-- Category Filter -->
+            <select v-model="categoryFilter" class="filter-select">
+              <option value="">Tất cả danh mục</option>
+              <option
+                v-for="cat in categories"
+                :key="cat.categoryId"
+                :value="cat.categoryId"
               >
-                <span class="item-name">{{ it.productName }}</span>
-                <span class="item-qty">× {{ it.quantity }}</span>
-                <span class="item-price">{{ formatPrice(it.subtotal) }}</span>
-              </li>
-            </ul>
+                {{ cat.categoryName }}
+              </option>
+            </select>
+
+            <!-- Status Filter -->
+            <select v-model="statusFilter" class="filter-select">
+              <option value="">Tất cả trạng thái</option>
+              <option value="available">Còn hàng</option>
+              <option value="unavailable">Hết hàng</option>
+            </select>
+          </div>
+
+          <!-- Actions -->
+          <div class="toolbar-actions">
+            <!-- View Toggle -->
+            <div class="view-toggle">
+              <button
+                @click="viewMode = 'cards'"
+                :class="{ active: viewMode === 'cards' }"
+                title="Card View"
+              >
+                ▦
+              </button>
+              <button
+                @click="viewMode = 'table'"
+                :class="{ active: viewMode === 'table' }"
+                title="Table View"
+              >
+                ☰
+              </button>
+            </div>
+
+            <button class="btn-refresh" @click="loadData" :disabled="loading">
+              <span :class="{ rotating: loading }">🔄</span>
+            </button>
+
+            <button class="btn-export" @click="exportData">
+              📥 Xuất Excel
+            </button>
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-close-modal" @click="closeDetails">
-            Đóng
-          </button>
+        <!-- Loading State -->
+        <div v-if="loading" class="loading-container">
+          <div class="spinner"></div>
+          <p>Đang tải dữ liệu...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="filteredProducts.length === 0" class="empty-state">
+          <div class="empty-icon">🍽️</div>
+          <h3>Không Tìm Thấy Món Ăn</h3>
+          <p>Thử thay đổi bộ lọc hoặc thêm món ăn mới</p>
+        </div>
+
+        <!-- Content Display -->
+        <div v-else>
+          <!-- Cards View -->
+          <div v-if="viewMode === 'cards'" class="cards-container">
+            <div class="products-grid">
+              <div
+                v-for="product in paginatedProducts"
+                :key="product.productId"
+                class="product-card"
+              >
+                <!-- Image -->
+                <div class="card-image">
+                  <img
+                    :src="getImageUrl(product.imageUrl)"
+                    :alt="product.productName"
+                  />
+                  <div class="image-overlay">
+                    <button
+                      class="overlay-btn"
+                      @click="editProduct(product)"
+                      title="Sửa"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      class="overlay-btn delete"
+                      @click="deleteProduct(product.productId)"
+                      title="Xóa"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                  <div v-if="!product.isAvailable" class="unavailable-badge">
+                    Hết Hàng
+                  </div>
+                </div>
+
+                <!-- Content -->
+                <div class="card-content">
+                  <div class="card-header-info">
+                    <h3 class="card-title">{{ product.productName }}</h3>
+                    <span :class="['category-tag', getCategoryClass(product)]">
+                      {{ getCategoryName(product) }}
+                    </span>
+                  </div>
+
+                  <p v-if="product.shortDescription" class="card-description">
+                    {{ truncateText(product.shortDescription, 60) }}
+                  </p>
+
+                  <div class="card-footer">
+                    <span class="card-price">{{
+                      formatPrice(product.price)
+                    }}</span>
+
+                    <!-- Availability Toggle -->
+                    <label class="mini-toggle" @click.stop>
+                      <input
+                        v-model="product.isAvailable"
+                        type="checkbox"
+                        @change="toggleAvailability(product)"
+                      />
+                      <span class="mini-toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table View -->
+          <div v-else class="table-container">
+            <table class="products-table">
+              <thead>
+                <tr>
+                  <th class="sortable" @click="sortTable('productName')">
+                    <div class="th-content">
+                      Tên Món
+                      <span class="sort-icon">{{
+                        getSortIcon("productName")
+                      }}</span>
+                    </div>
+                  </th>
+                  <th class="sortable text-right" @click="sortTable('price')">
+                    <div class="th-content">
+                      Giá Tiền
+                      <span class="sort-icon">{{ getSortIcon("price") }}</span>
+                    </div>
+                  </th>
+                  <th>Danh Mục</th>
+                  <th class="text-center">Trạng Thái</th>
+                  <th class="text-center">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="product in paginatedProducts"
+                  :key="product.productId"
+                  class="table-row"
+                >
+                  <td>
+                    <div class="product-cell">
+                      <img
+                        :src="getImageUrl(product.imageUrl)"
+                        :alt="product.productName"
+                        class="product-thumbnail"
+                      />
+                      <div class="product-info">
+                        <div class="product-name">
+                          {{ product.productName }}
+                        </div>
+                        <div
+                          v-if="product.shortDescription"
+                          class="product-desc"
+                        >
+                          {{ truncateText(product.shortDescription, 50) }}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="text-right">
+                    <span class="price-value">{{
+                      formatPrice(product.price)
+                    }}</span>
+                  </td>
+
+                  <td>
+                    <span
+                      :class="['category-badge', getCategoryClass(product)]"
+                    >
+                      {{ getCategoryName(product) }}
+                    </span>
+                  </td>
+
+                  <td class="text-center">
+                    <label class="table-toggle" @click.stop>
+                      <input
+                        v-model="product.isAvailable"
+                        type="checkbox"
+                        @change="toggleAvailability(product)"
+                      />
+                      <span class="table-toggle-slider"></span>
+                      <span class="table-toggle-label">
+                        {{ product.isAvailable ? "Còn hàng" : "Hết hàng" }}
+                      </span>
+                    </label>
+                  </td>
+
+                  <td class="text-center">
+                    <div class="table-actions">
+                      <button
+                        class="action-btn edit"
+                        @click="editProduct(product)"
+                        title="Sửa"
+                      >
+                        ✏️ Sửa
+                      </button>
+                      <button
+                        class="action-btn delete"
+                        @click="deleteProduct(product.productId)"
+                        title="Xóa"
+                      >
+                        🗑️ Xóa
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="pagination">
+            <button
+              @click="currentPage--"
+              :disabled="currentPage === 0"
+              class="page-btn"
+            >
+              ← Trước
+            </button>
+
+            <div class="page-numbers">
+              <button
+                v-for="page in visiblePages"
+                :key="page"
+                @click="currentPage = page - 1"
+                :class="['page-number', { active: currentPage === page - 1 }]"
+              >
+                {{ page }}
+              </button>
+            </div>
+
+            <button
+              @click="currentPage++"
+              :disabled="currentPage >= totalPages - 1"
+              class="page-btn"
+            >
+              Sau →
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -381,447 +537,349 @@
 
 <script>
 import api from "@/axios";
-import storage from "@/utils/storage";
 import Swal from "sweetalert2";
 
 export default {
-  name: "Orders",
+  name: "MenuManagement",
 
   data() {
     return {
-      orders: [],
+      products: [],
+      categories: [],
       loading: false,
       errorMsg: "",
-      // phân trang
-      page: 0,
-      size: 10,
-      totalPages: 0,
-      totalElements: 0,
-      // filter
+
+      // View & Filters
+      viewMode: "cards", // 'cards' or 'table'
+      searchQuery: "",
+      categoryFilter: "",
       statusFilter: "",
-      statusOptions: [
-        { value: "pending", label: "Chờ xử lý" },
-        { value: "confirmed", label: "Đã xác nhận" },
-        { value: "preparing", label: "Đang chuẩn bị" },
-        { value: "delivering", label: "Đang giao" },
-        { value: "delivered", label: "Đã giao" },
-        { value: "cancelled", label: "Đã hủy" },
-      ],
-      startDate: "",
-      endDate: "",
-      // modal
-      showModal: false,
-      selectedOrder: null,
-      confirmingId: null,
+
+      // Pagination
+      currentPage: 0,
+      pageSize: 12,
+
+      // Sorting
+      sortField: null,
+      sortDirection: "asc",
+
+      // Form
+      editing: false,
+      product: {
+        productId: null,
+        productName: "",
+        price: "",
+        categoryId: "",
+        imageUrl: "",
+        description: "",
+        shortDescription: "",
+        isAvailable: true,
+      },
+
+      // Image
+      previewUrl: null,
+      selectedFile: null,
     };
   },
 
   computed: {
-    paidCount() {
-      return this.orders.filter(
-        (o) => this.normalizeStatus(o.paymentStatus) === "paid"
-      ).length;
+    availableCount() {
+      return this.products.filter((p) => p.isAvailable !== false).length;
     },
-    unpaidCount() {
-      return this.orders.filter(
-        (o) => this.normalizeStatus(o.paymentStatus) !== "paid"
-      ).length;
+
+    unavailableCount() {
+      return this.products.filter((p) => p.isAvailable === false).length;
+    },
+
+    filteredProducts() {
+      let filtered = [...this.products];
+
+      // Search
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            (p.productName || "").toLowerCase().includes(query) ||
+            (p.shortDescription || "").toLowerCase().includes(query) ||
+            (p.description || "").toLowerCase().includes(query)
+        );
+      }
+
+      // Category Filter
+      if (this.categoryFilter) {
+        filtered = filtered.filter(
+          (p) =>
+            (p.categoryId || p.category?.categoryId) === this.categoryFilter
+        );
+      }
+
+      // Status Filter
+      if (this.statusFilter === "available") {
+        filtered = filtered.filter((p) => p.isAvailable !== false);
+      } else if (this.statusFilter === "unavailable") {
+        filtered = filtered.filter((p) => p.isAvailable === false);
+      }
+
+      // Sort
+      if (this.sortField) {
+        filtered.sort((a, b) => {
+          let aVal = a[this.sortField];
+          let bVal = b[this.sortField];
+
+          if (typeof aVal === "string") {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+          }
+
+          const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+          return this.sortDirection === "asc" ? comparison : -comparison;
+        });
+      }
+
+      return filtered;
+    },
+
+    paginatedProducts() {
+      const start = this.currentPage * this.pageSize;
+      const end = start + this.pageSize;
+      return this.filteredProducts.slice(start, end);
+    },
+
+    totalPages() {
+      return Math.ceil(this.filteredProducts.length / this.pageSize);
+    },
+
+    visiblePages() {
+      const pages = [];
+      const total = this.totalPages;
+      const current = this.currentPage + 1;
+
+      pages.push(1);
+
+      for (
+        let i = Math.max(2, current - 1);
+        i <= Math.min(total - 1, current + 1);
+        i++
+      ) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+
+      if (total > 1 && !pages.includes(total)) pages.push(total);
+
+      return pages;
     },
   },
 
   mounted() {
-    // Mặc định lọc theo hôm nay để không hiển thị đơn của ngày khác
-    this.setRange("today");
+    this.loadData();
   },
 
   methods: {
-    formatPrice(price) {
-      const value = Number(price || 0);
-      return value.toLocaleString("vi-VN") + "₫";
-    },
-
-    normalizeStatus(s) {
-      return (s || "").toString().toLowerCase();
-    },
-
-    getPaymentStatus(order) {
-      return this.normalizeStatus(order.paymentStatus);
-    },
-
-    getOrderStatus(order) {
-      return this.normalizeStatus(order.orderStatus);
-    },
-
-    getPaymentMethod(order) {
-      return this.normalizeStatus(order.paymentMethod);
-    },
-
-    getAddress(order) {
-      return order.addressLine || order.deliveryAddress || "";
-    },
-
-    getNote(order) {
-      const raw =
-        order?.notes ||
-        order?.note ||
-        order?.customerNote ||
-        order?.customerNotes;
-      if (!raw) return "";
-      const note = raw.toString().trim();
-      return note;
-    },
-
-    async confirmCash(order) {
-      const confirmResult = await Swal.fire({
-        icon: "question",
-        title: "Xác nhận đã nhận tiền mặt?",
-        text: `Đơn #${order.orderId}`,
-        showCancelButton: true,
-        confirmButtonText: "Đã nhận",
-        cancelButtonText: "Hủy",
-        confirmButtonColor: "#22c55e",
-        cancelButtonColor: "#9ca3af",
-      });
-      if (!confirmResult.isConfirmed) return;
-
-      const token = storage.getToken();
-      if (!token) {
-        this.$router.push("/login");
-        return;
-      }
+    async loadData() {
+      this.loading = true;
+      this.errorMsg = "";
 
       try {
-        this.confirmingId = order.orderId;
-        try {
-          await api.put(
-            `/admin/orders/${order.orderId}/confirm-cash`,
-            {},
-            {
-              headers: { Authorization: token ? `Bearer ${token}` : undefined },
-            }
-          );
-        } catch (err) {
-          // Fallback nếu BE không có endpoint admin
-          await api.put(
-            `/orders/${order.orderId}/confirm-cash`,
-            {},
-            {
-              headers: { Authorization: token ? `Bearer ${token}` : undefined },
-            }
-          );
-        }
-        order.paymentStatus = "paid";
-        order._changed = false;
-        this.toastSuccess("Thành công!", "Đã xác nhận thanh toán tiền mặt");
-      } catch (err) {
-        console.error("❌ Lỗi confirm cash:", err);
-        this.toastError(
-          "Lỗi",
-          err.response?.data?.message ||
-            err.response?.data?.error ||
-            "Không thể xác nhận thanh toán"
-        );
-      } finally {
-        this.confirmingId = null;
-      }
-    },
-
-    getShipping(order) {
-      const candidates = [
-        order.shippingFee,
-        order.deliveryFee,
-        order.shippingCost,
-      ].map((v) => Number(v));
-      const found = candidates.find((v) => !Number.isNaN(v));
-      return found || 0;
-    },
-
-    getSubtotal(order) {
-      const candidates = [
-        order.subtotal,
-        order.totalPrice,
-        order.total,
-        order.amount,
-        order.itemsTotal,
-        order.itemsSubtotal,
-        order.totalAmount && order.shippingFee != null
-          ? order.totalAmount - (order.shippingFee || 0)
-          : null,
-      ].map((v) => Number(v));
-      const found = candidates.find((v) => !Number.isNaN(v) && v > 0);
-      if (found) return found;
-
-      if (Array.isArray(order.items)) {
-        const sum = order.items.reduce((acc, it) => {
-          const subtotal = Number(it?.subtotal);
-          const priceQty = Number(it?.price) * Number(it?.quantity || 0);
-          const val =
-            !Number.isNaN(subtotal) && subtotal > 0
-              ? subtotal
-              : !Number.isNaN(priceQty) && priceQty > 0
-              ? priceQty
-              : 0;
-          return acc + val;
-        }, 0);
-        if (sum > 0) return sum;
-      }
-
-      return 0;
-    },
-
-    getTotal(order) {
-      const shipping = this.getShipping(order);
-      const subtotal = this.getSubtotal(order);
-      const primary = [
-        order.totalAmount,
-        order.finalAmount,
-        order.grandTotal,
-        order.totalCost,
-        order.totalPrice,
-        order.amount,
-        order.total,
-      ].map((v) => Number(v));
-      const primaryFound = primary.find((v) => Number.isFinite(v));
-
-      if (!Number.isNaN(subtotal) && subtotal > 0) {
-        return subtotal + shipping;
-      }
-
-      if (primaryFound !== undefined) {
-        return primaryFound + (primaryFound > 0 && shipping ? shipping : 0);
-      }
-
-      return subtotal + shipping;
-    },
-
-    formatDate(date) {
-      if (!date) return "";
-      return new Date(date).toLocaleString("vi-VN");
-    },
-
-    formatDateOnly(date) {
-      if (!date) return "";
-      const d = new Date(date);
-      if (Number.isNaN(d.getTime())) return "";
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    },
-
-    getStatusLabel(status) {
-      const found = this.statusOptions.find(
-        (s) => s.value === this.normalizeStatus(status)
-      );
-      return found ? found.label : status;
-    },
-
-    markAsChanged(order) {
-      order._changed = true;
-    },
-
-    onFilterChange() {
-      this.page = 0;
-      this.fetchOrders();
-    },
-
-    formatInputDate(dateObj) {
-      return dateObj.toISOString().split("T")[0];
-    },
-
-    setRange(type) {
-      const today = new Date();
-      const todayStr = this.formatInputDate(today);
-      let start = "";
-      let end = todayStr;
-
-      if (type === "today") {
-        start = todayStr;
-      } else if (type === "week") {
-        const s = new Date();
-        s.setDate(s.getDate() - 6);
-        start = this.formatInputDate(s);
-      } else if (type === "month") {
-        const s = new Date(today.getFullYear(), today.getMonth(), 1);
-        start = this.formatInputDate(s);
-      } else if (type === "all") {
-        start = "";
-        end = "";
-      }
-
-      this.startDate = start;
-      this.endDate = end;
-      this.onFilterChange();
-    },
-
-    changePage(newPage) {
-      if (newPage < 0 || newPage >= this.totalPages) return;
-      this.page = newPage;
-      this.fetchOrders();
-    },
-
-    // ==============================
-    // 🔥 LẤY DANH SÁCH ĐƠN HÀNG (ADMIN)
-    // ==============================
-    async fetchOrders() {
-      const token = storage.getToken();
-      if (!token) {
-        this.$router.push("/login");
-        return;
-      }
-
-      const loadOrders = async (url, withParams = true) => {
-        const opts = {
-          headers: { Authorization: `Bearer ${token}` },
-        };
-        if (withParams) {
-          opts.params = {
-            page: this.page,
-            size: this.size,
-            status: this.statusFilter || undefined,
-            startDate: this.startDate || undefined,
-            endDate: this.endDate || undefined,
-          };
-        }
-        return api.get(url, opts);
-      };
-
-      const normalizeResponse = (apiData) => {
-        let ordersData = [];
-
-        if (apiData?.success && apiData.data) {
-          const pageData = apiData.data;
-          ordersData = pageData.content || [];
-        } else if (apiData?.content) {
-          ordersData = apiData.content || [];
-        } else if (Array.isArray(apiData)) {
-          ordersData = apiData;
-        } else if (apiData?.data && Array.isArray(apiData.data)) {
-          ordersData = apiData.data;
-        }
-
-        ordersData.forEach((order) => {
-          order._changed = false;
-        });
-
-        const inRange = (order) => {
-          if (!this.startDate && !this.endDate) return true;
-          const created = this.formatDateOnly(order.createdAt);
-          if (!created) return false;
-          const startOk = this.startDate ? created >= this.startDate : true;
-          const endOk = this.endDate ? created <= this.endDate : true;
-          return startOk && endOk;
-        };
-
-        ordersData = ordersData.filter(inRange);
-
-        this.orders = ordersData;
-        // Nếu lọc phía client, cập nhật lại tổng
-        this.totalElements = ordersData.length;
-        this.totalPages = Math.max(
-          1,
-          Math.ceil(this.totalElements / Math.max(this.size, 1))
-        );
-      };
-
-      try {
-        this.loading = true;
-        this.errorMsg = "";
-
-        // 1) Thử endpoint admin có phân trang
-        let res;
-        try {
-          res = await loadOrders("/admin/orders", true);
-        } catch (err) {
-          // 2) Thử lại không truyền page/size (một số BE không hỗ trợ)
-          try {
-            res = await loadOrders("/admin/orders", false);
-          } catch (err2) {
-            // 3) Fallback sang endpoint /orders (trường hợp BE chưa mở admin)
-            res = await loadOrders("/orders", true);
-          }
-        }
-
-        normalizeResponse(res.data);
-      } catch (error) {
-        console.error("❌ LỖI KHI TẢI ORDERS:", error);
-        this.errorMsg =
-          error.response?.data?.message ||
-          error.message ||
-          "Không thể tải danh sách đơn hàng.";
-
-        if (error.response?.status === 401 || error.response?.status === 403) {
-          storage.clearAuth();
-          this.$router.push("/login");
-        }
+        await Promise.all([this.loadProducts(), this.loadCategories()]);
+      } catch (e) {
+        console.error("Error loading data:", e);
+        this.errorMsg = "Không thể tải dữ liệu!";
       } finally {
         this.loading = false;
       }
     },
 
-    // ==============================
-    // 🔥 CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG
-    // ==============================
-    async updateStatus(order, skipConfirm = false) {
-      if (!skipConfirm) {
-        const result = await Swal.fire({
-          icon: "question",
-          title: "Cập nhật trạng thái?",
-          html: `Đơn #<b>${order.orderId}</b><br/>Thành: <b>${this.getStatusLabel(
-            order.orderStatus
-          )}</b>`,
-          showCancelButton: true,
-          confirmButtonText: "Cập nhật",
-          cancelButtonText: "Hủy",
-          confirmButtonColor: "#2563eb",
-          cancelButtonColor: "#9ca3af",
+    async loadProducts() {
+      try {
+        const res = await api.get("/products", {
+          params: { includeUnavailable: true, page: 0, size: 200 },
         });
-        if (!result.isConfirmed) return;
+        this.products = res.data?.data?.content || res.data?.data || [];
+      } catch (e) {
+        console.error("Error loading products:", e);
+        throw e;
       }
+    },
 
-      const token = storage.getToken();
-      if (!token) {
-        this.$router.push("/login");
+    async loadCategories() {
+      try {
+        const res = await api.get("/categories");
+        this.categories = res.data?.data || [];
+      } catch (e) {
+        console.error("Error loading categories:", e);
+        throw e;
+      }
+    },
+
+    handleFileChange(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+        Swal.fire({
+          icon: "error",
+          title: "File quá lớn!",
+          text: "Vui lòng chọn ảnh dưới 5MB",
+        });
         return;
       }
 
-      const payload = { status: order.orderStatus };
-      const headers = { Authorization: `Bearer ${token}` };
+      if (!file.type.startsWith("image/")) {
+        Swal.fire({
+          icon: "error",
+          title: "File không hợp lệ!",
+          text: "Vui lòng chọn file ảnh",
+        });
+        return;
+      }
 
-      try {
-        try {
-          await api.patch(`/admin/orders/${order.orderId}/status`, payload, {
-            headers,
-          });
-        } catch (err) {
-          // Fallback BE không có endpoint admin
-          await api.patch(`/orders/${order.orderId}/status`, payload, {
-            headers,
-          });
-        }
+      this.selectedFile = file;
 
-        this.toastSuccess("Thành công!", "Đã cập nhật trạng thái đơn hàng.");
-        order._changed = false;
-        this.fetchOrders();
-      } catch (error) {
-        console.error("❌ Không thể cập nhật trạng thái:", error);
-        this.toastError(
-          "Lỗi",
-          error.response?.data?.message ||
-            "Không thể cập nhật trạng thái đơn hàng!"
-        );
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.previewUrl = e.target?.result || null;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    removeImage() {
+      this.previewUrl = null;
+      this.selectedFile = null;
+      this.product.imageUrl = "";
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.value = "";
       }
     },
 
-    showDetails(order) {
-      this.selectedOrder = order;
-      this.showModal = true;
+    async saveProduct() {
+      if (!this.product.productName?.trim()) {
+        Swal.fire({
+          icon: "warning",
+          title: "Thiếu thông tin!",
+          text: "Vui lòng nhập tên món ăn",
+        });
+        return;
+      }
+
+      if (!this.product.price || this.product.price < 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "Thiếu thông tin!",
+          text: "Vui lòng nhập giá hợp lệ",
+        });
+        return;
+      }
+
+      if (!this.product.categoryId) {
+        Swal.fire({
+          icon: "warning",
+          title: "Thiếu thông tin!",
+          text: "Vui lòng chọn danh mục",
+        });
+        return;
+      }
+
+      this.loading = true;
+      this.errorMsg = "";
+
+      try {
+        let imageUrl = this.product.imageUrl;
+
+        if (this.selectedFile) {
+          const uploadRes = await this.uploadImage(this.selectedFile);
+          imageUrl =
+            uploadRes.path ||
+            uploadRes.url ||
+            uploadRes.filename ||
+            uploadRes ||
+            "";
+        }
+
+        const payload = {
+          productName: this.product.productName.trim(),
+          price: Number(this.product.price),
+          categoryId: Number(this.product.categoryId),
+          imageUrl: imageUrl || "",
+          description: this.product.description?.trim() || "",
+          shortDescription: this.product.shortDescription?.trim() || "",
+          isAvailable: this.product.isAvailable !== false,
+        };
+
+        if (this.editing && this.product.productId) {
+          await api.put(`/products/${this.product.productId}`, payload);
+          await Swal.fire({
+            icon: "success",
+            title: "Thành công!",
+            text: "Món ăn đã được cập nhật",
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        } else {
+          await api.post("/products", payload);
+          await Swal.fire({
+            icon: "success",
+            title: "Thành công!",
+            text: "Món ăn đã được thêm vào menu",
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        }
+
+        await this.loadProducts();
+        this.resetForm();
+      } catch (e) {
+        console.error("Error saving product:", e);
+        this.errorMsg = `Lỗi: ${e.response?.data?.message || e.message}`;
+        await Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: this.errorMsg,
+        });
+      } finally {
+        this.loading = false;
+      }
     },
 
-    async deleteOrder(order) {
+    async uploadImage(file) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const res = await api.post("/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return res.data?.data || res.data || {};
+      } catch (e) {
+        console.error("Error uploading image:", e);
+        throw new Error("Không thể upload ảnh!");
+      }
+    },
+
+    editProduct(product) {
+      this.editing = true;
+
+      this.product = {
+        productId: product.productId,
+        productName: product.productName || "",
+        price: product.price || "",
+        categoryId: product.categoryId || product.category?.categoryId || "",
+        imageUrl: product.imageUrl || "",
+        description: product.description || "",
+        shortDescription: product.shortDescription || "",
+        isAvailable: product.isAvailable !== false,
+      };
+
+      if (product.imageUrl) {
+        this.previewUrl = this.getImageUrl(product.imageUrl);
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+
+    async deleteProduct(id) {
       const result = await Swal.fire({
-        title: "Xóa đơn hàng?",
-        text: `Bạn có chắc muốn xóa đơn #${order.orderId}?`,
+        title: "Xóa món ăn?",
+        text: "Thao tác này không thể hoàn tác",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#ef4444",
@@ -829,74 +887,185 @@ export default {
         confirmButtonText: "Xóa",
         cancelButtonText: "Hủy",
       });
+
       if (!result.isConfirmed) return;
+
+      this.loading = true;
+
       try {
-        const id = order.orderId || order.id;
-        if (!id) throw new Error("Không tìm thấy ID đơn hàng");
-
-        // Admin có thể xóa bất kỳ đơn hàng nào (hard delete)
-        await api.delete(`/admin/orders/${id}`);
-
-        this.toastSuccess("Thành công!", "Đã xóa đơn hàng.");
-        this.fetchOrders();
-      } catch (error) {
-        console.error("❌ Không thể xóa đơn:", error);
-        this.toastError(
-          "Lỗi",
-          error.response?.data?.message || "Không thể xóa đơn hàng!"
-        );
+        await api.delete(`/products/${id}`);
+        await this.loadProducts();
+        await Swal.fire({
+          icon: "success",
+          title: "Đã xóa!",
+          text: "Món ăn đã được xóa",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } catch (e) {
+        console.error("Error deleting product:", e);
+        await Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: e.response?.data?.message || "Không thể xóa món ăn",
+        });
+      } finally {
+        this.loading = false;
       }
     },
 
-    closeDetails() {
-      this.showModal = false;
-      this.selectedOrder = null;
+    async toggleAvailability(product) {
+      const newStatus = !product.isAvailable;
+
+      try {
+        const payload = {
+          productName: product.productName,
+          price: Number(product.price),
+          categoryId: Number(
+            product.categoryId || product.category?.categoryId
+          ),
+          imageUrl: product.imageUrl || "",
+          description: product.description || "",
+          shortDescription: product.shortDescription || "",
+          isAvailable: newStatus,
+        };
+
+        await api.put(`/products/${product.productId}`, payload);
+
+        const idx = this.products.findIndex(
+          (p) => p.productId === product.productId
+        );
+        if (idx !== -1) {
+          this.products[idx].isAvailable = newStatus;
+        }
+      } catch (e) {
+        console.error("Error toggling availability:", e);
+        product.isAvailable = !newStatus; // Revert
+        await Swal.fire({
+          icon: "error",
+          title: "Lỗi!",
+          text: "Không thể cập nhật trạng thái",
+        });
+      }
     },
 
-    toastSuccess(title, text) {
+    cancelEdit() {
+      Swal.fire({
+        title: "Hủy chỉnh sửa?",
+        text: "Các thay đổi chưa lưu sẽ bị bỏ qua",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Hủy",
+        cancelButtonText: "Tiếp tục",
+      }).then((res) => {
+        if (res.isConfirmed) {
+          this.resetForm();
+        }
+      });
+    },
+
+    resetForm() {
+      this.editing = false;
+      this.previewUrl = null;
+      this.selectedFile = null;
+
+      this.product = {
+        productId: null,
+        productName: "",
+        price: "",
+        categoryId: "",
+        imageUrl: "",
+        description: "",
+        shortDescription: "",
+        isAvailable: true,
+      };
+
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.value = "";
+      }
+    },
+
+    sortTable(field) {
+      if (this.sortField === field) {
+        this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc";
+      } else {
+        this.sortField = field;
+        this.sortDirection = "asc";
+      }
+    },
+
+    getSortIcon(field) {
+      if (this.sortField !== field) return "⇅";
+      return this.sortDirection === "asc" ? "↑" : "↓";
+    },
+
+    exportData() {
+      const csv = this.generateCSV();
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `menu-${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
       Swal.fire({
         icon: "success",
-        title,
-        text,
-        confirmButtonColor: "#2563eb",
-        confirmButtonText: "OK",
+        title: "Đã xuất!",
+        text: "File CSV đã được tải xuống",
+        timer: 1500,
+        showConfirmButton: false,
       });
     },
 
-    toastError(title, text) {
-      Swal.fire({
-        icon: "error",
-        title,
-        text,
-        confirmButtonColor: "#ef4444",
-        confirmButtonText: "OK",
-      });
+    generateCSV() {
+      const headers = ["Tên Món", "Giá", "Danh Mục", "Trạng Thái"];
+      const rows = this.products.map((p) => [
+        p.productName,
+        p.price,
+        this.getCategoryName(p),
+        p.isAvailable !== false ? "Còn hàng" : "Hết hàng",
+      ]);
+      return [headers, ...rows].map((row) => row.join(",")).join("\n");
     },
 
-    advanceStatus(order) {
-      const flow = [
-        "pending",
-        "confirmed",
-        "preparing",
-        "delivering",
-        "delivered",
-      ];
-      const current = this.normalizeStatus(order.orderStatus);
-      const idx = flow.indexOf(current);
-      const next = idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : null;
-      if (!next) {
-        this.toastError("Thông báo", "Trạng thái đã ở bước cuối cùng.");
-        return;
-      }
-      order.orderStatus = next;
-      order._changed = true;
-      // Ghi luôn xuống backend, bỏ confirm
-      this.updateStatus(order, true);
+    getImageUrl(url) {
+      if (!url) return "/images/no-image.png";
+
+      const backendUrl = "http://localhost:3000";
+
+      if (url.startsWith("http")) return url;
+      if (url.startsWith("/uploads")) return `${backendUrl}${url}`;
+      return `${backendUrl}/uploads/${url}`;
     },
 
-    isTerminal(status) {
-      const norm = this.normalizeStatus(status);
-      return norm === "delivered" || norm === "cancelled";
+    getCategoryName(product) {
+      if (product.category?.categoryName) return product.category.categoryName;
+
+      const catId = product.categoryId || product.category?.categoryId;
+      const found = this.categories.find((c) => c.categoryId === catId);
+      if (found) return found.categoryName;
+
+      const map = {
+        1: "Món chính",
+        2: "Món phụ",
+        3: "Đồ uống",
+        4: "Tráng miệng",
+        5: "Topping",
+      };
+      return map[catId] || "Khác";
+    },
+
+    getCategoryClass(product) {
+      const catId = product.categoryId || product.category?.categoryId;
+      return `cat-${catId || 0}`;
+    },
+
+    formatPrice(value) {
+      return Number(value).toLocaleString("vi-VN") + "₫";
+    },
+
+    truncateText(text, maxLength) {
+      if (!text) return "";
+      if (text.length <= maxLength) return text;
+      return text.substring(0, maxLength) + "...";
     },
   },
 };
@@ -904,267 +1073,617 @@ export default {
 
 <style scoped>
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
-.orders-page {
-  padding: 24px 32px;
-  background: linear-gradient(135deg, #f4f7fb 0%, #e1e9f7 100%);
+.menu-management {
   min-height: 100vh;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  padding: 30px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 }
 
-/* ========== ERROR BANNER ========== */
-.error-banner {
-  background: linear-gradient(135deg, #e6eefc 0%, #e6eefc 100%);
-  color: #dc2626;
+/* ============ HEADER ============ */
+.page-header {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 30px;
+  overflow: hidden;
+}
+
+.header-content {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 30px;
+  color: white;
+}
+
+.title-section h1 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-section h1 .icon {
+  font-size: 36px;
+}
+
+.subtitle {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.quick-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.stat-item {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-item:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+/* ============ ALERTS ============ */
+.alert {
   padding: 16px 24px;
   border-radius: 12px;
   margin-bottom: 24px;
-  border: 1px solid #c6d7f7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.alert-error {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+  border-left: 4px solid #dc2626;
+}
+
+.alert-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.alert-message {
+  flex: 1;
+  font-weight: 600;
+}
+
+.alert-close {
+  background: #dc2626;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+}
+
+.alert-close:hover {
+  transform: scale(1.1);
+}
+
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-fade-enter-from {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+/* ============ MAIN LAYOUT ============ */
+.main-layout {
+  display: grid;
+  grid-template-columns: 450px 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+/* ============ FORM SECTION ============ */
+.form-section {
+  position: sticky;
+  top: 30px;
+}
+
+.form-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.form-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 24px;
+  color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  animation: slideDown 0.3s ease;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.form-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.close-error {
-  background: #dc2626;
+.editing-badge {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.label-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.required {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.optional {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.3s;
+  background: white;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-with-addon {
+  position: relative;
+  display: flex;
+}
+
+.input-with-addon .form-input {
+  padding-right: 60px;
+}
+
+.input-addon {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.char-counter {
+  text-align: right;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* Image Upload */
+.image-preview {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.preview-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.btn-remove-image {
+  width: 100%;
+  padding: 10px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-remove-image:hover {
+  background: #fecaca;
+}
+
+.image-upload {
+  text-align: center;
+  padding: 40px 20px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  transition: all 0.3s;
+}
+
+.image-upload:hover {
+  border-color: #667eea;
+  background: #f1f5f9;
+}
+
+.btn-upload {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-upload:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.upload-hint {
+  margin: 12px 0 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* Toggle */
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s;
+}
+
+.toggle-wrapper:hover {
+  background: #f1f5f9;
+}
+
+.toggle-input {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  background: #cbd5e1;
+  border-radius: 14px;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.toggle-slider::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background: #10b981;
+}
+
+.toggle-input:checked + .toggle-slider::after {
+  transform: translateX(24px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Form Actions */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  flex: 1;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 2px solid #e2e8f0;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* ============ CONTENT SECTION ============ */
+.content-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Toolbar */
+.toolbar {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 250px;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  font-size: 18px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px 12px 48px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.clear-search {
+  position: absolute;
+  right: 12px;
+  background: #e2e8f0;
   border: none;
   width: 28px;
   height: 28px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 16px;
-}
-
-/* ========== HEADER SECTION ========== */
-.header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
-  gap: 24px;
-}
-
-.header-content {
-  flex: 1;
-  min-width: 280px;
-}
-
-.page-title {
-  font-size: 2.2rem;
-  font-weight: 800;
-  color: #2563eb;
-  margin-bottom: 8px;
-}
-
-.page-subtitle {
-  font-size: 1rem;
-  color: #3b82f6;
-  font-weight: 500;
-}
-
-/* ========== STATS CARDS ========== */
-.stats-cards {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.stat-card {
-  background: white;
-  padding: 20px 28px;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: all 0.3s ease;
-  min-width: 180px;
-  border-left: 4px solid #60a5fa;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-}
-
-.stat-card.paid {
-  background: linear-gradient(135deg, #d8e8ff 0%, #bbf7d0 100%);
-  border-left-color: #22c55e;
-}
-
-.stat-card.unpaid {
-  background: linear-gradient(135deg, #e8f0ff 0%, #dbeafe 100%);
-  border-left-color: #f59e0b;
-}
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-number {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: #1f2937;
-}
-
-.stat-label {
-  font-size: 0.85rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* ========== TABLE SECTION ========== */
-.table-section {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.table-header {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  padding: 20px 28px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.table-header h3 {
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 100%;
-}
-
-.filter-group label {
   font-size: 14px;
-  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.clear-search:hover {
+  background: #cbd5e1;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
 }
 
 .filter-select {
-  padding: 12px 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
   border-radius: 10px;
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  cursor: pointer;
-  min-width: 140px;
-}
-
-.filter-select option {
-  color: #333;
+  font-weight: 600;
   background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 160px;
 }
 
-.date-range {
+.filter-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.toolbar-actions {
   display: flex;
-  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  padding: 12px 16px;
-  border-radius: 14px;
 }
 
-.date-field {
+.view-toggle {
   display: flex;
-  flex-direction: column;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 4px;
   gap: 4px;
 }
 
-.date-field label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-}
-
-.date-field input {
-  padding: 10px 12px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.95);
-  min-width: 180px;
-  font-weight: 700;
-  font-size: 15px;
-}
-
-.quick-range {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.btn-quick {
-  padding: 12px 16px;
-  border-radius: 10px;
-  border: 2px solid #e5e7eb;
-  background: #f3f4f6;
+.view-toggle button {
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: 700;
-  color: #111827;
-  transition: all 0.2s ease;
-  min-width: 110px;
-  text-align: center;
+  font-size: 18px;
+  transition: all 0.3s;
+  color: #64748b;
 }
 
-.btn-quick:hover {
-  background: #3b82f6;
-  color: white;
-  border-color: #2563eb;
+.view-toggle button.active {
+  background: white;
+  color: #667eea;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.btn-refresh {
+.btn-refresh,
+.btn-export {
   padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: none;
   border-radius: 10px;
-  color: white;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
 }
 
+.btn-refresh {
+  background: #667eea;
+  color: white;
+  font-size: 20px;
+  padding: 12px 16px;
+}
+
 .btn-refresh:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .btn-refresh:disabled {
@@ -1172,322 +1691,47 @@ export default {
   cursor: not-allowed;
 }
 
-/* ========== TABLE ========== */
-.table-container {
-  overflow-x: auto;
+.rotating {
+  animation: rotate 1s linear infinite;
 }
 
-/* Cards Layout */
-.cards-container {
-  padding: 20px;
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.orders-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+.btn-export {
+  background: #10b981;
+  color: white;
 }
 
-.order-card {
+.btn-export:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* ============ LOADING & EMPTY ============ */
+.loading-container,
+.empty-state {
   background: white;
-  border: 1px solid #f4f7fb;
   border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.order-card__top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.order-code {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.order-id {
-  font-weight: 700;
-  color: #6b7280;
-  font-size: 12px;
-}
-
-.order-short {
-  font-family: monospace;
-  font-size: 14px;
-  color: #1f2937;
-  background: #e8f0ff;
-  padding: 4px 8px;
-  border-radius: 6px;
-  max-width: 180px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.order-total {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-weight: 800;
-  min-width: 110px;
-  text-align: right;
-  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.2);
-}
-
-.order-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.meta-item.full {
-  grid-column: 1 / -1;
-}
-
-.meta-label {
-  font-size: 12px;
-  color: #9ca3af;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.meta-value {
-  font-size: 14px;
-  color: #1f2937;
-  font-weight: 600;
-}
-
-.order-status-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  align-items: center;
-}
-
-.pill {
-  background: #f8f5ff;
-  border: 1px solid #e0e7ff;
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pill-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-}
-
-.pill-badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.pill-badge.paid {
-  background: #d8e8ff;
-  color: #166534;
-}
-.pill-badge.pending {
-  background: #e8f0ff;
-  color: #92400e;
-}
-.pill-badge.failed {
-  background: #e6eefc;
-  color: #991b1b;
-}
-
-.pill-method {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 600;
-}
-
-.status-select-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.status-select-wrapper label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  background: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.status-select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-}
-
-.status-pending {
-  border-color: #fbbf24;
-  background: #fffbeb;
-}
-.status-confirmed {
-  border-color: #60a5fa;
-  background: #eff6ff;
-}
-.status-preparing {
-  border-color: #60a5fa;
-  background: #e8f0ff;
-}
-.status-delivering {
-  border-color: #34d399;
-  background: #ecfdf5;
-}
-.status-delivered {
-  border-color: #22c55e;
-  background: #d8e8ff;
-}
-.status-cancelled {
-  border-color: #f87171;
-  background: #e9efff;
-}
-
-.card-actions {
-  justify-content: flex-end;
-}
-
-/* Action Buttons */
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.btn-action {
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.btn-action:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.btn-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-confirm {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: white;
-}
-
-.btn-update {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-}
-
-.btn-details {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-}
-
-.btn-next {
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-  color: white;
-}
-
-.btn-delete {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: white;
-}
-
-.order-note {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #e8f0ff;
-  border: 1px solid #fcd34d;
-  display: flex;
-  gap: 8px;
-}
-
-.note-label {
-  font-weight: 700;
-  color: #92400e;
-  font-size: 13px;
-}
-
-.note-text {
-  color: #78350f;
-  font-size: 13px;
-  word-break: break-word;
-}
-
-/* Loading & Empty States */
-.loading-cell,
-.empty-cell {
+  padding: 80px 40px;
   text-align: center;
-  padding: 60px 20px !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
-.loading-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  color: #3b82f6;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e1e9f7;
-  border-top-color: #3b82f6;
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #667eea;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 20px;
 }
 
 @keyframes spin {
@@ -1496,307 +1740,608 @@ export default {
   }
 }
 
-.empty-cell {
-  color: #9ca3af;
+.loading-container p {
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .empty-icon {
-  font-size: 3rem;
-  margin-bottom: 12px;
-  display: block;
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
-/* Pagination */
-.pagination {
-  padding: 20px 28px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  border-top: 1px solid #f4f7fb;
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  color: #1e293b;
+  font-size: 20px;
 }
 
-.pagination button {
-  padding: 10px 20px;
-  border-radius: 10px;
-  border: none;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+.empty-state p {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+}
+
+/* ============ CARDS VIEW ============ */
+.cards-container {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.product-card {
+  background: white;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s;
   cursor: pointer;
-  font-weight: 600;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: #e2e8f0;
+}
+
+.card-image {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   transition: all 0.3s;
 }
 
-.pagination button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+.product-card:hover .card-image img {
+  transform: scale(1.05);
 }
 
-.pagination button:disabled {
-  background: #e5e7eb;
-  cursor: not-allowed;
-}
-
-.page-info {
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* ========== MODAL ========== */
-.modal-overlay {
-  position: fixed;
+.image-overlay {
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 20px;
+  gap: 12px;
+  opacity: 0;
+  transition: all 0.3s;
 }
 
-.modal-content {
+.product-card:hover .image-overlay {
+  opacity: 1;
+}
+
+.overlay-btn {
+  padding: 10px 20px;
   background: white;
-  border-radius: 20px;
-  width: 100%;
-  max-width: 540px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-}
-
-.modal-header h3 {
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-
-.modal-close {
-  background: rgba(255, 255, 255, 0.2);
+  color: #1e293b;
   border: none;
-  color: white;
-  font-size: 20px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: rotate(90deg);
-}
-
-.modal-body {
-  padding: 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f4f7fb;
-}
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
-  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
 }
 
-.detail-value {
-  font-weight: 500;
-  color: #1f2937;
-  font-size: 14px;
+.overlay-btn:hover {
+  transform: scale(1.05);
 }
 
-.detail-value.total {
-  font-size: 18px;
-  font-weight: 800;
-  color: #2563eb;
+.overlay-btn.delete {
+  background: #ef4444;
+  color: white;
 }
 
-.detail-note-row {
-  align-items: flex-start;
-}
-
-.note-value {
-  text-align: right;
-  color: #92400e;
-  white-space: pre-wrap;
-}
-
-.status-badge {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+.unavailable-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(239, 68, 68, 0.95);
   color: white;
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
-  font-weight: 600;
-}
-
-.items-section {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 2px solid #f4f7fb;
-}
-
-.items-section h4 {
-  font-size: 15px;
-  color: #2563eb;
-  margin-bottom: 12px;
   font-weight: 700;
 }
 
-.items-list {
-  list-style: none;
-  background: #faf5ff;
-  border-radius: 12px;
-  overflow: hidden;
+.card-content {
+  padding: 16px;
 }
 
-.item-row {
+.card-header-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.category-tag {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.category-tag.cat-1 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.category-tag.cat-2 {
+  background: #d1fae5;
+  color: #065f46;
+}
+.category-tag.cat-3 {
+  background: #fef3c7;
+  color: #92400e;
+}
+.category-tag.cat-4 {
+  background: #fce7f3;
+  color: #9f1239;
+}
+.category-tag.cat-5 {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.card-description {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.card-price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+/* Mini Toggle */
+.mini-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.mini-toggle input {
+  display: none;
+}
+
+.mini-toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #cbd5e1;
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.mini-toggle-slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.mini-toggle input:checked + .mini-toggle-slider {
+  background: #10b981;
+}
+
+.mini-toggle input:checked + .mini-toggle-slider::after {
+  transform: translateX(20px);
+}
+
+/* ============ TABLE VIEW ============ */
+.table-container {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.products-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.products-table thead {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.products-table th {
+  padding: 16px 20px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.products-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.products-table th.sortable:hover {
+  background: #e2e8f0;
+}
+
+.th-content {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f4f7fb;
+  gap: 8px;
 }
 
-.item-row:last-child {
-  border-bottom: none;
+.sort-icon {
+  color: #94a3b8;
+  font-size: 12px;
 }
 
-.item-name {
-  flex: 1;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.item-qty {
-  width: 60px;
-  text-align: center;
-  color: #6b7280;
-}
-
-.item-price {
-  width: 100px;
+.text-right {
   text-align: right;
-  font-weight: 700;
-  color: #2563eb;
 }
 
-.modal-footer {
-  padding: 20px 24px;
-  border-top: 1px solid #f4f7fb;
+.text-center {
+  text-align: center;
+}
+
+.products-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.table-row {
+  transition: background 0.2s;
+}
+
+.table-row:hover {
+  background: #f8fafc;
+}
+
+.product-cell {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
 }
 
-.btn-close-modal {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  border: none;
-  padding: 12px 28px;
+.product-thumbnail {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+.product-info {
+  flex: 1;
+}
+
+.product-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.product-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.price-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 6px 14px;
   border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.category-badge.cat-1 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.category-badge.cat-2 {
+  background: #d1fae5;
+  color: #065f46;
+}
+.category-badge.cat-3 {
+  background: #fef3c7;
+  color: #92400e;
+}
+.category-badge.cat-4 {
+  background: #fce7f3;
+  color: #9f1239;
+}
+.category-badge.cat-5 {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+/* Table Toggle */
+.table-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.table-toggle input {
+  display: none;
+}
+
+.table-toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #cbd5e1;
+  border-radius: 12px;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.table-toggle-slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.table-toggle input:checked + .table-toggle-slider {
+  background: #10b981;
+}
+
+.table-toggle input:checked + .table-toggle-slider::after {
+  transform: translateX(20px);
+}
+
+.table-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Table Actions */
+.table-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s;
+  white-space: nowrap;
 }
 
-.btn-close-modal:hover {
+.action-btn.edit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.action-btn.edit:hover {
+  background: #bfdbfe;
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
 }
 
-/* ========== RESPONSIVE ========== */
-@media (max-width: 1024px) {
-  .header-section {
-    flex-direction: column;
+.action-btn.delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.action-btn.delete:hover {
+  background: #fecaca;
+  transform: translateY(-2px);
+}
+
+/* ============ PAGINATION ============ */
+.pagination {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.page-btn {
+  padding: 10px 20px;
+  border: 2px solid #e2e8f0;
+  background: white;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #475569;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 6px;
+}
+
+.page-number {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #e2e8f0;
+  background: white;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #475569;
+}
+
+.page-number:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.page-number.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 
-  .stats-cards {
-    width: 100%;
-  }
-
-  .stat-card {
-    flex: 1;
-    min-width: 0;
+  .form-section {
+    position: static;
   }
 }
 
 @media (max-width: 768px) {
-  .orders-page {
+  .menu-management {
     padding: 16px;
   }
 
-  .page-title {
-    font-size: 1.6rem;
+  .title-section h1 {
+    font-size: 24px;
   }
 
-  .table-header {
+  .quick-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .header-actions {
-    flex-direction: column;
-  }
-
-  .filter-select,
-  .btn-refresh {
+  .search-box {
     width: 100%;
   }
 
-  .stat-card {
-    padding: 16px 20px;
+  .filters {
+    flex-direction: column;
   }
 
-  .stat-number {
-    font-size: 1.4rem;
+  .filter-select {
+    width: 100%;
   }
 
-  .action-buttons {
-    flex-wrap: nowrap;
+  .toolbar-actions {
+    flex-direction: column;
   }
 
-  .btn-action {
-    width: 34px;
-    height: 34px;
-    font-size: 14px;
+  .btn-export {
+    width: 100%;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .products-table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column;
   }
 }
 </style>

@@ -119,6 +119,74 @@
               </div>
             </div>
 
+            <!-- ========== ORDER TRACKING MAP (NEW!) ========== -->
+            <div v-if="showMap(order)" class="order-tracking-section">
+              <h4 class="section-title">
+                <i class="fas fa-map-marked-alt"></i>
+                Theo Dõi Đơn Hàng
+              </h4>
+
+              <!-- Map Container (Leaflet + OSM) -->
+              <div :id="'map-' + order.orderId" class="map-container"></div>
+
+              <!-- Delivery Stats -->
+              <div class="delivery-stats">
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <i class="fas fa-route"></i>
+                  </div>
+                  <div class="stat-content">
+                    <p class="stat-label">Khoảng cách</p>
+                    <p class="stat-value">{{ order.distance || "N/A" }} km</p>
+                  </div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <i class="fas fa-clock"></i>
+                  </div>
+                  <div class="stat-content">
+                    <p class="stat-label">Thời gian</p>
+                    <p class="stat-value">
+                      ~{{ order.duration || "N/A" }} phút
+                    </p>
+                  </div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-icon">
+                    <i class="fas fa-shipping-fast"></i>
+                  </div>
+                  <div class="stat-content">
+                    <p class="stat-label">Phí ship</p>
+                    <p class="stat-value">
+                      {{ formatVND(getShipping(order)) }}đ
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ETA Countdown (if delivering) -->
+              <div
+                v-if="order.estimatedArrival && isDelivering(order)"
+                class="eta-section"
+              >
+                <div class="eta-content">
+                  <span class="eta-label">🚚 Dự kiến giao:</span>
+                  <span class="eta-time">{{
+                    formatTime(order.estimatedArrival)
+                  }}</span>
+                </div>
+                <div class="eta-progress">
+                  <div
+                    class="eta-bar"
+                    :style="{ width: getDeliveryProgress(order) + '%' }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <!-- ========== END ORDER TRACKING MAP ========== -->
+
             <!-- Order Items -->
             <div v-if="getItems(order).length" class="items-section">
               <h4 class="section-title">
@@ -264,6 +332,7 @@
 </template>
 
 <script>
+/* eslint-disable no-undef */
 import api from "@/axios";
 import { mapState } from "vuex";
 import storage from "@/utils/storage";
@@ -281,6 +350,18 @@ export default {
       autoRefreshMs: 7000,
       countdownTimer: null,
       selectedDate: "",
+
+      // ========== MAPS (OSM/Leaflet) ==========
+      mapsLoaded: false,
+      maps: {}, // Store map instances
+      mapRoutes: {}, // Store route layers for each map
+
+      // Restaurant location (fixed)
+      restaurantLocation: {
+        lat: 10.855232,
+        lng: 106.78578,
+        address: "Khu Công Nghệ Cao, Phường Hiệp Phú, TP Thủ Đức",
+      },
 
       progressSteps: [
         { status: "pending", icon: "fas fa-clock", label: "Chờ xác nhận" },
@@ -315,6 +396,7 @@ export default {
 
   mounted() {
     this.loadOrders();
+    this.ensureLeaflet(); // Load Leaflet
     this.startAutoRefresh();
     this.countdownTimer = setInterval(() => {
       this.$forceUpdate();
@@ -330,6 +412,162 @@ export default {
   },
 
   methods: {
+    // ========== LEAFLET (OSM) MAP METHODS ==========
+
+    async ensureLeaflet() {
+      if (this.mapsLoaded && window.L) return true;
+
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(css);
+
+      await new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject();
+        document.body.appendChild(script);
+      });
+
+      this.mapsLoaded = true;
+      return true;
+    },
+
+    async initAllMaps() {
+      if (!this.displayedOrders.length) return;
+      await this.ensureLeaflet();
+      for (const order of this.displayedOrders) {
+        if (this.showMap(order)) {
+          await this.initMap(order);
+        }
+      }
+    },
+
+    showMap(order) {
+      // Only show map if order has delivery coordinates and is not cancelled
+      return (
+        order.deliveryLat &&
+        order.deliveryLng &&
+        this.normalizeStatus(order.orderStatus) !== "cancelled"
+      );
+    },
+
+    async initMap(order) {
+      if (!this.mapsLoaded || !window.L) return;
+
+      const mapId = "map-" + order.orderId;
+      const mapElement = document.getElementById(mapId);
+      if (!mapElement) return;
+
+      const L = window.L;
+      const delivery = [
+        Number(order.deliveryLat),
+        Number(order.deliveryLng),
+      ];
+      const restaurant = [
+        Number(this.restaurantLocation.lat),
+        Number(this.restaurantLocation.lng),
+      ];
+
+      let map = this.maps[order.orderId];
+      if (!map) {
+        map = L.map(mapId, {
+          zoomControl: true,
+          scrollWheelZoom: true,
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "© OpenStreetMap contributors",
+        }).addTo(map);
+        this.maps[order.orderId] = map;
+      }
+
+      if (!map._pdqLayers) {
+        map._pdqLayers = L.layerGroup().addTo(map);
+      }
+      map._pdqLayers.clearLayers();
+
+      const restaurantMarker = L.circleMarker(restaurant, {
+        radius: 10,
+        color: "#00b067",
+        fillColor: "#00b067",
+        fillOpacity: 0.9,
+      }).bindTooltip("PDQ Restaurant");
+      const deliveryMarker = L.circleMarker(delivery, {
+        radius: 10,
+        color: "#3b82f6",
+        fillColor: "#3b82f6",
+        fillOpacity: 0.9,
+      }).bindTooltip("Địa chỉ giao hàng");
+
+      map._pdqLayers.addLayer(restaurantMarker);
+      map._pdqLayers.addLayer(deliveryMarker);
+
+      // Clear old route
+      if (this.mapRoutes[order.orderId]) {
+        map.removeLayer(this.mapRoutes[order.orderId]);
+        delete this.mapRoutes[order.orderId];
+      }
+
+      // Fit bounds and draw route via OSRM
+      const bounds = L.latLngBounds([restaurant, delivery]);
+      map.fitBounds(bounds, { padding: [20, 20] });
+
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${restaurant[1]},${restaurant[0]};${delivery[1]},${delivery[0]}?overview=full&geometries=geojson`;
+      try {
+        const res = await fetch(osrmUrl);
+        const data = await res.json();
+        const coords = data?.routes?.[0]?.geometry?.coordinates || [];
+        if (coords.length) {
+          const latlngs = coords.map((c) => [c[1], c[0]]);
+          const poly = L.polyline(latlngs, {
+            color: "#00b067",
+            weight: 5,
+            opacity: 0.8,
+          }).addTo(map);
+          this.mapRoutes[order.orderId] = poly;
+          bounds.extend(poly.getBounds());
+          map.fitBounds(bounds, { padding: [20, 20] });
+        }
+      } catch (err) {
+        console.error("OSRM route error:", err);
+      }
+    },
+
+    isDelivering(order) {
+      const status = this.normalizeStatus(order.orderStatus);
+      return status === "shipping" || status === "delivering";
+    },
+
+    formatTime(datetime) {
+      if (!datetime) return "N/A";
+      return new Date(datetime).toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    },
+
+    getDeliveryProgress(order) {
+      // Calculate progress based on time
+      if (!order.createdAt || !order.estimatedArrival) return 0;
+
+      const created = new Date(order.createdAt);
+      const estimated = new Date(order.estimatedArrival);
+      const now = new Date();
+
+      const total = estimated - created;
+      const elapsed = now - created;
+
+      if (total <= 0) return 0;
+
+      const progress = (elapsed / total) * 100;
+      return Math.min(Math.max(progress, 0), 100);
+    },
+
+    // ========== END MAP METHODS ==========
+
     startAutoRefresh() {
       this.stopAutoRefresh();
       this.refreshTimer = setInterval(() => {
@@ -360,6 +598,13 @@ export default {
             ? data
             : apiData.data?.content || [];
           this.orders = rawOrders.map((o) => this.normalizeOrder(o));
+
+          // Initialize maps after orders loaded
+          this.$nextTick(() => {
+            if (this.mapsLoaded) {
+              this.initAllMaps();
+            }
+          });
         } else {
           this.orders = [];
         }
@@ -1125,6 +1370,119 @@ export default {
   font-size: 16px;
 }
 
+/* ========== ORDER TRACKING MAP (NEW!) ========== */
+.order-tracking-section {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+  background: linear-gradient(to bottom, #f0fdf4 0%, #ffffff 100%);
+}
+
+.map-container {
+  height: 350px;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid var(--gray-200);
+}
+
+.delivery-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 176, 103, 0.1);
+  border-color: var(--primary);
+}
+
+.stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary) 0%, #00d97e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  box-shadow: 0 4px 10px rgba(0, 176, 103, 0.2);
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--gray-600);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+/* ETA Section */
+.eta-section {
+  padding: 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 12px;
+  border: 2px solid #fbbf24;
+}
+
+.eta-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.eta-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #78350f;
+}
+
+.eta-time {
+  font-size: 18px;
+  font-weight: 800;
+  color: #92400e;
+  font-family: monospace;
+}
+
+.eta-progress {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.eta-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+  transition: width 0.5s ease;
+}
+/* ========== END ORDER TRACKING MAP ========== */
+
 /* Items Section */
 .items-section {
   padding: 20px 24px;
@@ -1465,6 +1823,14 @@ export default {
   .order-meta {
     flex-direction: column;
     gap: 12px;
+  }
+
+  .delivery-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .map-container {
+    height: 280px;
   }
 
   .progress-steps {

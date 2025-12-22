@@ -8,3 +8,9 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+# ========== GOOGLE MAPS CONFIGURATION ==========
+google:
+  maps:
+    api:
+      key: ${GOOGLE_MAPS_API_KEY:demo-google-maps-key}

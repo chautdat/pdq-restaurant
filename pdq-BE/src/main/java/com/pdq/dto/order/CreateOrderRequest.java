@@ -18,10 +18,15 @@ public class CreateOrderRequest {
     private String district;
     private String city;
 
+    private Double deliveryLat;
+    private Double deliveryLng;
+
     @NotNull(message = "Payment method is required")
     private String paymentMethod; // "cash" or "vnpay"
 
     private String notes;
+    
+    private String promoCode; // Promotional code to apply discount
 
     // Constructors
     public CreateOrderRequest() {}
@@ -83,11 +88,35 @@ public class CreateOrderRequest {
         this.paymentMethod = paymentMethod;
     }
 
+    public Double getDeliveryLat() {
+        return deliveryLat;
+    }
+
+    public void setDeliveryLat(Double deliveryLat) {
+        this.deliveryLat = deliveryLat;
+    }
+
+    public Double getDeliveryLng() {
+        return deliveryLng;
+    }
+
+    public void setDeliveryLng(Double deliveryLng) {
+        this.deliveryLng = deliveryLng;
+    }
+
     public String getNotes() {
         return notes;
     }
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getPromoCode() {
+        return promoCode;
+    }
+
+    public void setPromoCode(String promoCode) {
+        this.promoCode = promoCode;
     }
 }

@@ -23,6 +23,11 @@ public class OrderResponse {
     private String paymentStatus;
     private String orderStatus;
     private String notes;
+    private Double deliveryLat;
+    private Double deliveryLng;
+    private Double distance;
+    private Integer duration;
+    private LocalDateTime estimatedArrival;
     private String shortCode; // mã ngắn gọn hiển thị UI (kiểu Grab)
     private List<OrderItemResponse> items;
     private LocalDateTime paymentExpiresAt;
@@ -169,6 +174,46 @@ public class OrderResponse {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public Double getDeliveryLat() {
+        return deliveryLat;
+    }
+
+    public void setDeliveryLat(Double deliveryLat) {
+        this.deliveryLat = deliveryLat;
+    }
+
+    public Double getDeliveryLng() {
+        return deliveryLng;
+    }
+
+    public void setDeliveryLng(Double deliveryLng) {
+        this.deliveryLng = deliveryLng;
+    }
+
+    public Double getDistance() {
+        return distance;
+    }
+
+    public void setDistance(Double distance) {
+        this.distance = distance;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
+
+    public LocalDateTime getEstimatedArrival() {
+        return estimatedArrival;
+    }
+
+    public void setEstimatedArrival(LocalDateTime estimatedArrival) {
+        this.estimatedArrival = estimatedArrival;
     }
 
     public String getShortCode() {

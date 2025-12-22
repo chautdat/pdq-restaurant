@@ -49,11 +49,29 @@ public class Order {
     @Column(name = "address_line", nullable = false, length = 255)
     private String addressLine;
 
+    @Column(name = "delivery_lat")
+    private Double deliveryLat;
+
+    @Column(name = "delivery_lng")
+    private Double deliveryLng;
+
+    @Column(name = "distance")
+    private Double distance;
+
+    @Column(name = "duration")
+    private Integer duration;
+
+    @Column(name = "estimated_arrival")
+    private LocalDateTime estimatedArrival;
+
     @Column(nullable = false, precision = 38, scale = 2)
     private BigDecimal subtotal;
 
     @Column(name = "discount_amount", precision = 10, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "promo_code", length = 50)
+    private String promoCode; // Applied promotional code
 
     @Column(name = "shipping_fee", precision = 10, scale = 2)
     private BigDecimal shippingFee = BigDecimal.ZERO;
@@ -223,6 +241,46 @@ public class Order {
         }
     }
 
+    public Double getDeliveryLat() {
+        return deliveryLat;
+    }
+
+    public void setDeliveryLat(Double deliveryLat) {
+        this.deliveryLat = deliveryLat;
+    }
+
+    public Double getDeliveryLng() {
+        return deliveryLng;
+    }
+
+    public void setDeliveryLng(Double deliveryLng) {
+        this.deliveryLng = deliveryLng;
+    }
+
+    public Double getDistance() {
+        return distance;
+    }
+
+    public void setDistance(Double distance) {
+        this.distance = distance;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
+    }
+
+    public LocalDateTime getEstimatedArrival() {
+        return estimatedArrival;
+    }
+
+    public void setEstimatedArrival(LocalDateTime estimatedArrival) {
+        this.estimatedArrival = estimatedArrival;
+    }
+
     public BigDecimal getSubtotal() {
         return subtotal;
     }
@@ -237,6 +295,14 @@ public class Order {
 
     public void setDiscountAmount(BigDecimal discountAmount) {
         this.discountAmount = discountAmount;
+    }
+
+    public String getPromoCode() {
+        return promoCode;
+    }
+
+    public void setPromoCode(String promoCode) {
+        this.promoCode = promoCode;
     }
 
     public BigDecimal getShippingFee() {

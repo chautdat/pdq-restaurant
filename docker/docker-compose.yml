@@ -60,8 +60,11 @@ services:
     depends_on:
       - mysql
       - redis
+
+    env_file:
+      - .env
     volumes:
-      # ✅ FIX: Mount uploads từ NGOÀI pdq-BE (cùng cấp với docker folder)
+      # ✅ Mount uploads từ ngoài pdq-BE
       - ../uploads:/app/uploads
     environment:
       TZ: Asia/Ho_Chi_Minh
@@ -80,6 +83,7 @@ services:
       VNPAY_RETURN_URL: https://unfundamental-leonarda-torchlike.ngrok-free.dev/api/payment/vnpay/callback
       ZALOPAY_CALLBACK_URL: https://unfundamental-leonarda-torchlike.ngrok-free.dev/api/payment/zalopay/callback
       GROQ_API_KEY: ${GROQ_API_KEY}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
     ports:
       - "3000:3000"
     networks:

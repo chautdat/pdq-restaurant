@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.pdq.dto.common.PageResponse;
 import com.pdq.dto.order.CancelOrderRequest;
@@ -69,9 +70,12 @@ public class OrderService {
     private final WebSocketService webSocketService;
     private final ApplicationEventPublisher eventPublisher;
     private final RabbitMQProducer rabbitMQProducer;
+    private final PromoCodeService promoCodeService;
+
+    private static final double RESTAURANT_LAT = 10.855232;
+    private static final double RESTAURANT_LNG = 106.785780;
 
     private static final BigDecimal DELIVERY_FEE = new BigDecimal("15000");
-    private static final BigDecimal FREE_SHIPPING_THRESHOLD = new BigDecimal("200000");
 
     public OrderService(OrderRepository orderRepository,
                        OrderItemRepository orderItemRepository,
@@ -86,7 +90,8 @@ public class OrderService {
                        OrderEmailService orderEmailService,
                        WebSocketService webSocketService,
                        ApplicationEventPublisher eventPublisher,
-                       RabbitMQProducer rabbitMQProducer) {
+                       RabbitMQProducer rabbitMQProducer,
+                       PromoCodeService promoCodeService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.userRepository = userRepository;
@@ -101,6 +106,7 @@ public class OrderService {
         this.webSocketService = webSocketService;
         this.eventPublisher = eventPublisher;
         this.rabbitMQProducer = rabbitMQProducer;
+        this.promoCodeService = promoCodeService;
     }
 
     @Transactional
@@ -167,14 +173,13 @@ public class OrderService {
             }
             
             BigDecimal discountAmount = BigDecimal.ZERO;
-            BigDecimal shippingFee = subtotal.compareTo(FREE_SHIPPING_THRESHOLD) >= 0 ? 
-                                    BigDecimal.ZERO : DELIVERY_FEE;
+            BigDecimal shippingFee = DELIVERY_FEE; // Default, will be calculated based on distance
             BigDecimal finalAmount = subtotal.subtract(discountAmount).add(shippingFee);
             BigDecimal totalAmount = finalAmount;
             
             System.out.println("   → Subtotal: " + subtotal);
             System.out.println("   → Discount: " + discountAmount);
-            System.out.println("   → Shipping: " + shippingFee);
+            System.out.println("   → Shipping (initial): " + shippingFee);
             System.out.println("   → Total: " + totalAmount);
             System.out.println("   → Final: " + finalAmount);
 
@@ -198,12 +203,56 @@ public class OrderService {
             order.setDeliveryAddress(address);
             order.setAddressLine(address.length() > 255 ? address.substring(0, 255) : address);
             System.out.println("   → Address: " + address);
+
+            // Geo coords (REQUIRED for shipping fee calculation)
+            Double deliveryLat = request.getDeliveryLat();
+            Double deliveryLng = request.getDeliveryLng();
+            
+            if (deliveryLat == null || deliveryLng == null) {
+                throw new BadRequestException("Delivery latitude and longitude are required for shipping fee calculation");
+            }
+            
+            order.setDeliveryLat(deliveryLat);
+            order.setDeliveryLng(deliveryLng);
             
             order.setSubtotal(subtotal);
             order.setDiscountAmount(discountAmount);
             order.setShippingFee(shippingFee);
             order.setTotalAmount(totalAmount);
             order.setFinalAmount(finalAmount);
+
+            // 4a. Apply promo code if provided (BEFORE calculating delivery info)
+            String appliedPromoCode = null;
+            if (request.getPromoCode() != null && !request.getPromoCode().trim().isEmpty()) {
+                System.out.println("4a️⃣ Applying promo code: " + request.getPromoCode());
+                com.pdq.entity.PromoCode promoCode = promoCodeService.validateAndApplyPromoCode(
+                    request.getPromoCode().trim(),
+                    subtotal,
+                    user.getUserId()
+                );
+
+                if (promoCode != null) {
+                    discountAmount = promoCodeService.calculateDiscountAmount(promoCode, subtotal);
+                    appliedPromoCode = promoCode.getCode();
+
+                    // If promo is FREE_SHIPPING, set shippingFee to 0
+                    if (com.pdq.entity.PromoCode.DiscountType.FREE_SHIPPING.equals(promoCode.getDiscountType())) {
+                        shippingFee = BigDecimal.ZERO;
+                    }
+
+                    System.out.println("   ✅ Promo applied: " + appliedPromoCode);
+                    System.out.println("   → Discount amount: " + discountAmount);
+                    System.out.println("   → Shipping fee after promo: " + shippingFee);
+                }
+            }
+
+            order.setPromoCode(appliedPromoCode); // 🎁 Set applied promo code
+
+            // Tính lại distance/fee nếu có lat/lng
+            calculateDeliveryInfo(order);
+            shippingFee = order.getShippingFee();
+            finalAmount = order.getFinalAmount();
+            totalAmount = order.getTotalAmount();
             
             // ✅ Set payment method (THÊM ZALOPAY)
             String paymentMethodStr = request.getPaymentMethod();
@@ -798,6 +847,90 @@ public class OrderService {
         return "ORD" + timestamp + random;
     }
 
+    private void calculateDeliveryInfo(Order order) {
+        if (order.getDeliveryLat() == null || order.getDeliveryLng() == null) {
+            System.err.println("⚠️ Delivery coordinates missing - using default shipping fee");
+            return;
+        }
+
+        try {
+            // Use Haversine formula to calculate distance (no Google Maps API)
+            double distanceKm = haversineDistanceKm(
+                    RESTAURANT_LAT,
+                    RESTAURANT_LNG,
+                    order.getDeliveryLat(),
+                    order.getDeliveryLng()
+            );
+            
+            // Estimate duration (simple: ~30 km/h average speed in city)
+            int durationMin = (int) Math.round((distanceKm / 30.0) * 60);
+
+            order.setDistance(distanceKm > 0 ? distanceKm : null);
+            order.setDuration(durationMin > 0 ? durationMin : null);
+            if (durationMin > 0) {
+                order.setEstimatedArrival(LocalDateTime.now().plusMinutes(durationMin));
+            }
+
+            BigDecimal subtotal = order.getSubtotal() != null ? order.getSubtotal() : BigDecimal.ZERO;
+            BigDecimal discount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+
+            // Calculate shipping fee based on distance
+            // Only free shipping if it's a FREE_SHIPPING promo
+            BigDecimal fee = calculateShippingFee(distanceKm);
+            
+            // Check if shipping fee was already set to 0 by promo code
+            boolean hasPromoFreeShipping = order.getShippingFee() != null
+                    && order.getShippingFee().compareTo(BigDecimal.ZERO) == 0;
+            
+            if (!hasPromoFreeShipping) {
+                order.setShippingFee(fee);
+            }
+
+            BigDecimal finalAmount = subtotal.subtract(discount).add(order.getShippingFee());
+            order.setFinalAmount(finalAmount);
+            order.setTotalAmount(finalAmount);
+            
+            System.out.println("   → Distance (Haversine): " + String.format("%.2f", distanceKm) + " km");
+            System.out.println("   → Duration (estimated): " + durationMin + " min");
+            System.out.println("   → Shipping fee (calculated): " + order.getShippingFee());
+            System.out.println("   → Final amount (after delivery calc): " + finalAmount);
+        } catch (Exception e) {
+            System.err.println("⚠️ Could not calculate delivery info: " + e.getMessage());
+        }
+    }
+
+    private double haversineDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return 6371 * c;
+    }
+
+    private BigDecimal calculateShippingFee(double distanceKm) {
+        // Ensure minimum 1 km (avoid returning fixed fee for 0 distance)
+        if (distanceKm <= 0) {
+            distanceKm = 1.0;
+        }
+        
+        // 0-3 km: 15,000 VND
+        if (distanceKm <= 3) {
+            return DELIVERY_FEE;
+        }
+        
+        // > 3 km: 15,000 + (distance - 3) * 5,000 per km
+        BigDecimal base = DELIVERY_FEE;
+        BigDecimal extraKm = BigDecimal.valueOf(distanceKm - 3);
+        BigDecimal extra = extraKm.multiply(new BigDecimal("5000"));
+        BigDecimal total = base.add(extra);
+        
+        // Round to nearest 5,000
+        long rounded = Math.round(total.doubleValue() / 5000.0) * 5000;
+        return BigDecimal.valueOf(rounded);
+    }
+
     private OrderResponse mapToResponse(Order order) {
         OrderResponse response = new OrderResponse();
         response.setOrderId(order.getOrderId());
@@ -821,6 +954,11 @@ public class OrderService {
         response.setPaymentExpiresAt(order.getPaymentExpiresAt());
         response.setRetryCount(order.getRetryCount());
         response.setMaxRetries(order.getMaxRetries());
+        response.setDeliveryLat(order.getDeliveryLat());
+        response.setDeliveryLng(order.getDeliveryLng());
+        response.setDistance(order.getDistance());
+        response.setDuration(order.getDuration());
+        response.setEstimatedArrival(order.getEstimatedArrival());
         response.setShortCode(buildShortCode(order));
         response.setCreatedAt(order.getCreatedAt());
         response.setUpdatedAt(order.getUpdatedAt());

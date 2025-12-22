@@ -225,6 +225,8 @@ export default {
       districts: [],
       wards: [],
       filteredItems: [],
+      citiesLoaded: false,
+      pendingExternalAddress: null,
     };
   },
 
@@ -262,10 +264,111 @@ export default {
   async mounted() {
     console.log("🚀 AddressSelector mounted");
     await this.loadCities();
+    if (this.pendingExternalAddress) {
+      const tmp = { ...this.pendingExternalAddress };
+      this.pendingExternalAddress = null;
+      await this.applyExternalAddress(tmp);
+    }
     await this.loadSavedAddresses();
   },
 
   methods: {
+    normalize(str = "") {
+      return str
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+    },
+
+    findByName(list = [], name = "") {
+      if (!name) return null;
+      const target = this.normalize(name);
+      return (
+        list.find((i) => this.normalize(i.name) === target) ||
+        list.find((i) => this.normalize(i.name).includes(target)) ||
+        null
+      );
+    },
+
+    async ensureCitiesLoaded() {
+      if (!this.citiesLoaded) {
+        await this.loadCities();
+      }
+      return true;
+    },
+
+    // Cho phép component cha đẩy dữ liệu city/district/ward vào selector
+    async applyExternalAddress({
+      city,
+      district,
+      ward,
+      addressLine,
+    } = {}) {
+      try {
+        // Nếu cities chưa sẵn sàng, lưu pending và sẽ apply sau
+        if (!this.citiesLoaded || !this.cities.length) {
+          this.pendingExternalAddress = { city, district, ward, addressLine };
+          await this.ensureCitiesLoaded();
+          if (this.pendingExternalAddress) {
+            const tmp = { ...this.pendingExternalAddress };
+            this.pendingExternalAddress = null;
+            return await this.applyExternalAddress(tmp);
+          }
+        }
+
+        // City
+        if (city) {
+          const cityObj = this.findByName(this.cities, city);
+          if (cityObj) {
+            this.selectedCity = cityObj;
+            await this.loadDistricts(cityObj.code);
+          } else {
+            // Nếu không khớp với dữ liệu API, vẫn set tạm để hiển thị/validate
+            this.selectedCity = { name: city, code: null };
+          }
+        }
+
+        // District
+        if (district) {
+          if (this.districts.length) {
+            const distObj = this.findByName(this.districts, district);
+            if (distObj) {
+              this.selectedDistrict = distObj;
+              await this.loadWards(distObj.code);
+            } else {
+              this.selectedDistrict = { name: district, code: null };
+            }
+          } else {
+            this.selectedDistrict = { name: district, code: null };
+          }
+        }
+
+        // Ward
+        if (ward) {
+          if (this.wards.length) {
+            const wardObj = this.findByName(this.wards, ward);
+            this.selectedWard = wardObj || { name: ward, code: null };
+          } else {
+            this.selectedWard = { name: ward, code: null };
+          }
+        }
+
+        if (addressLine) {
+          this.addressDetail = addressLine;
+          this.$emit("update:modelValue", addressLine);
+        }
+
+        // Emit ra để parent không còn lỗi validation
+        this.$emit("update:city", this.selectedCity?.name || "");
+        this.$emit("update:district", this.selectedDistrict?.name || "");
+        this.$emit("update:ward", this.selectedWard?.name || "");
+      } catch (err) {
+        console.error("applyExternalAddress error:", err);
+      }
+    },
+
     getAddressId(addr) {
       return addr?.id || addr?.addressId || addr?.address_id || addr?._id;
     },
@@ -452,9 +555,11 @@ export default {
         this.loading = true;
         const response = await fetch(`${this.apiUrl}/p/`);
         this.cities = await response.json();
+        this.citiesLoaded = true;
       } catch (error) {
         console.error("❌ Error loading cities:", error);
         this.cities = [];
+        this.citiesLoaded = false;
       } finally {
         this.loading = false;
       }

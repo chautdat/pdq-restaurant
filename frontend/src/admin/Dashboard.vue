@@ -323,52 +323,128 @@ export default {
 
     async fetchStats(token) {
       try {
+        console.log("📊 Fetching stats...");
+
         // Total earnings
-        const earningsRes = await api.get("/orders/total-earnings", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const totalEarnings = earningsRes.data?.data || earningsRes.data || 0;
-        this.cards[0].value = this.formatCurrency(totalEarnings);
-        this.cards[0].trend = 12.5;
+        try {
+          const earningsRes = await api.get("/orders/total-earnings", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          console.log("💰 Earnings response:", earningsRes.data);
+
+          // Handle different response formats
+          let totalEarnings = 0;
+          if (
+            earningsRes.data?.success &&
+            earningsRes.data?.data !== undefined
+          ) {
+            totalEarnings = Number(earningsRes.data.data) || 0;
+          } else if (earningsRes.data?.data !== undefined) {
+            totalEarnings = Number(earningsRes.data.data) || 0;
+          } else if (typeof earningsRes.data === "number") {
+            totalEarnings = Number(earningsRes.data) || 0;
+          }
+
+          this.cards[0].value = this.formatCurrency(totalEarnings);
+          this.cards[0].trend = 12.5;
+          console.log("✅ Total Earnings:", totalEarnings);
+        } catch (error) {
+          console.warn("⚠️ Error fetching earnings:", error.message);
+          this.cards[0].value = "N/A";
+          this.cards[0].trend = 0;
+        }
 
         // Today's orders
-        const todayOrdersRes = await api.get("/orders/today-count", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const todayOrders =
-          todayOrdersRes.data?.data || todayOrdersRes.data || 0;
-        this.cards[1].value = todayOrders.toString();
-        this.cards[1].trend = -5.2;
+        try {
+          const todayOrdersRes = await api.get("/orders/today-count", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          console.log("📦 Today's orders response:", todayOrdersRes.data);
+
+          let todayOrders = 0;
+          if (
+            todayOrdersRes.data?.success &&
+            todayOrdersRes.data?.data !== undefined
+          ) {
+            todayOrders = Number(todayOrdersRes.data.data) || 0;
+          } else if (todayOrdersRes.data?.data !== undefined) {
+            todayOrders = Number(todayOrdersRes.data.data) || 0;
+          } else if (typeof todayOrdersRes.data === "number") {
+            todayOrders = Number(todayOrdersRes.data) || 0;
+          }
+
+          this.cards[1].value = todayOrders.toString();
+          this.cards[1].trend = -5.2;
+          console.log("✅ Today's Orders:", todayOrders);
+        } catch (error) {
+          console.warn("⚠️ Error fetching today's orders:", error.message);
+          this.cards[1].value = "N/A";
+          this.cards[1].trend = 0;
+        }
 
         // Total users
-        const usersRes = await api.get("/users/count", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const totalUsers = usersRes.data?.data || usersRes.data || 0;
-        this.cards[2].value = totalUsers.toString();
-        this.cards[2].trend = 8.1;
+        try {
+          const usersRes = await api.get("/users/count", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          console.log("👥 Users response:", usersRes.data);
+
+          let totalUsers = 0;
+          if (usersRes.data?.success && usersRes.data?.data !== undefined) {
+            totalUsers = Number(usersRes.data.data) || 0;
+          } else if (usersRes.data?.data !== undefined) {
+            totalUsers = Number(usersRes.data.data) || 0;
+          } else if (typeof usersRes.data === "number") {
+            totalUsers = Number(usersRes.data) || 0;
+          }
+
+          this.cards[2].value = totalUsers.toString();
+          this.cards[2].trend = 8.1;
+          console.log("✅ Total Users:", totalUsers);
+        } catch (error) {
+          console.warn("⚠️ Error fetching users:", error.message);
+          this.cards[2].value = "N/A";
+          this.cards[2].trend = 0;
+        }
 
         // Total products
-        const productsRes = await api.get("/products/count", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const totalProducts = productsRes.data?.data || productsRes.data || 0;
-        this.cards[3].value = totalProducts.toString();
-        this.cards[3].trend = 15.3;
+        try {
+          const productsRes = await api.get("/products/count", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          console.log("🍽️ Products response:", productsRes.data);
 
-        console.log("✅ Stats loaded");
+          let totalProducts = 0;
+          if (
+            productsRes.data?.success &&
+            productsRes.data?.data !== undefined
+          ) {
+            totalProducts = Number(productsRes.data.data) || 0;
+          } else if (productsRes.data?.data !== undefined) {
+            totalProducts = Number(productsRes.data.data) || 0;
+          } else if (typeof productsRes.data === "number") {
+            totalProducts = Number(productsRes.data) || 0;
+          }
+
+          this.cards[3].value = totalProducts.toString();
+          this.cards[3].trend = 15.3;
+          console.log("✅ Total Products:", totalProducts);
+        } catch (error) {
+          console.warn("⚠️ Error fetching products:", error.message);
+          this.cards[3].value = "N/A";
+          this.cards[3].trend = 0;
+        }
+
+        console.log("✅ All stats loaded successfully");
       } catch (error) {
         console.error("❌ Error fetching stats:", error);
-        this.cards[0].value = "N/A";
-        this.cards[1].value = "N/A";
-        this.cards[2].value = "N/A";
-        this.cards[3].value = "N/A";
       }
     },
 
     async fetchLatestOrders(token) {
       try {
         this.loadingOrders = true;
+        console.log("📋 Fetching latest orders...");
 
         const res = await api.get("/orders", {
           headers: { Authorization: `Bearer ${token}` },
@@ -379,23 +455,50 @@ export default {
           },
         });
 
-        console.log("✅ Orders response:", res.data);
+        console.log("📋 Orders API Response:", res);
+        console.log("📋 Orders data:", res.data);
 
-        if (res.data?.success && res.data.data) {
+        // Try multiple response format patterns
+        let ordersList = [];
+
+        if (res.data?.success && res.data?.data) {
           if (Array.isArray(res.data.data)) {
-            this.orders = res.data.data.slice(0, 5);
-          } else if (res.data.data.content) {
-            this.orders = res.data.data.content.slice(0, 5);
+            console.log("✅ Format 1: success + array data");
+            ordersList = res.data.data;
+          } else if (
+            res.data.data?.content &&
+            Array.isArray(res.data.data.content)
+          ) {
+            console.log("✅ Format 2: success + pagination object");
+            ordersList = res.data.data.content;
           }
         } else if (Array.isArray(res.data)) {
-          this.orders = res.data.slice(0, 5);
-        } else if (res.data?.content) {
-          this.orders = res.data.content.slice(0, 5);
+          console.log("✅ Format 3: direct array");
+          ordersList = res.data;
+        } else if (res.data?.content && Array.isArray(res.data.content)) {
+          console.log("✅ Format 4: pagination object");
+          ordersList = res.data.content;
+        } else if (
+          res.data?.data?.content &&
+          Array.isArray(res.data.data.content)
+        ) {
+          console.log("✅ Format 5: nested pagination");
+          ordersList = res.data.data.content;
         }
 
+        // Filter and limit to 5 orders
+        this.orders = ordersList.slice(0, 5);
         console.log(`✅ Loaded ${this.orders.length} orders`);
+        console.log("📋 Orders:", this.orders);
+
+        // If no orders, show empty state
+        if (this.orders.length === 0) {
+          console.warn("⚠️ No orders found in response");
+        }
       } catch (error) {
         console.error("❌ Error fetching orders:", error);
+        console.error("Error message:", error.message);
+        console.error("Error response:", error.response?.data);
         this.orders = [];
       } finally {
         this.loadingOrders = false;

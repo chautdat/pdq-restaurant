@@ -18,7 +18,19 @@
           <span>Mã đơn hàng:</span>
           <strong>{{ orderInfo.orderNumber || orderNumber }}</strong>
         </div>
-        <div class="detail-row" v-if="orderInfo.totalAmount">
+        <div class="detail-row" v-if="orderInfo.subtotal != null">
+          <span>Tạm tính:</span>
+          <strong>{{ formatVND(orderInfo.subtotal) }}</strong>
+        </div>
+        <div class="detail-row" v-if="orderInfo.shippingFee != null">
+          <span>Phí vận chuyển:</span>
+          <strong>{{ formatVND(orderInfo.shippingFee) }}</strong>
+        </div>
+        <div class="detail-row" v-if="orderInfo.discount > 0">
+          <span>Giảm giá:</span>
+          <strong>-{{ formatVND(orderInfo.discount) }}</strong>
+        </div>
+        <div class="detail-row" v-if="orderInfo.totalAmount != null">
           <span>Tổng tiền:</span>
           <strong>{{ formatVND(orderInfo.totalAmount) }}</strong>
         </div>

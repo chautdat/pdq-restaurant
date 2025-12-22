@@ -28,6 +28,7 @@ import Users from "@/admin/Users.vue";
 import Sales from "@/admin/Sales.vue";
 import Earnings from "@/admin/Earnings.vue";
 import KitchenDisplay from "@/admin/KitchenDisplay.vue";
+import PromoCodeManager from "@/admin/PromoCodeManager.vue";
 import CustomerOrderTracking from "@/pages/CustomerOrderTracking.vue";
 
 const routes = [
@@ -127,6 +128,11 @@ const routes = [
         component: Sales,
       },
       { path: "earnings", name: "AdminEarnings", component: Earnings },
+      {
+        path: "promo-codes",
+        name: "AdminPromoCodes",
+        component: PromoCodeManager,
+      },
     ],
   },
 
