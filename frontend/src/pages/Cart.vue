@@ -414,6 +414,13 @@ export default {
     async removeItem(item) {
       console.log("🗑️ removeItem() called");
       console.log("📦 Item:", item);
+      console.log("📦 Item cartItemId:", item.cartItemId);
+      console.log("📦 Item id:", item.id);
+      console.log("📦 Item itemId:", item.itemId);
+      console.log(
+        "🔑 Token:",
+        storage.getToken() ? "Có token" : "KHÔNG CÓ TOKEN!"
+      );
 
       const result = await Swal.fire({
         title: "Xóa sản phẩm?",
@@ -457,33 +464,26 @@ export default {
         });
 
         console.log("✅ Item deleted from backend");
+        console.log("✅ Response:", res?.data);
 
-        // ✅ Ưu tiên dùng dữ liệu trả về từ BE nếu có
-        const cartData = res?.data?.data;
-        if (cartData) {
-          this.cartSummary = {
-            cartId: cartData.cartId,
-            totalItems: cartData.totalItems || 0,
-            totalPrice: cartData.totalPrice || 0,
-          };
-          this.cart = cartData.items || [];
-          this.dispatchCartUpdated();
-        } else {
-          // ✅ XÓA KHỎI MẢNG NGAY LẬP TỨC (fallback)
-          const index = this.cart.findIndex(
-            (i) => (i.cartItemId || i.id || i.itemId) === itemId
-          );
-          if (index !== -1) {
-            this.cart.splice(index, 1);
-          }
-          this.cartSummary.totalItems = this.cart.length;
-          this.cartSummary.totalPrice = this.cart.reduce(
-            (sum, i) => sum + (i.subtotal || i.price * i.quantity),
-            0
-          );
-          this.dispatchCartUpdated();
-          await this.loadCart(); // đồng bộ lại
+        // ✅ XÓA KHỎI MẢNG NGAY LẬP TỨC để UI update nhanh
+        const index = this.cart.findIndex(
+          (i) => (i.cartItemId || i.id || i.itemId) === itemId
+        );
+        if (index !== -1) {
+          this.cart.splice(index, 1);
+          console.log("✅ Removed item at index:", index);
         }
+
+        // ✅ Cập nhật summary
+        this.cartSummary.totalItems = this.cart.length;
+        this.cartSummary.totalPrice = this.cart.reduce(
+          (sum, i) => sum + (i.subtotal || i.price * i.quantity),
+          0
+        );
+
+        // ✅ DISPATCH EVENT để cập nhật icon giỏ hàng
+        this.dispatchCartUpdated();
 
         // ✅ HIỆN THÔNG BÁO
         await Swal.fire({
@@ -493,6 +493,9 @@ export default {
           showConfirmButton: false,
           timer: 1500,
         });
+
+        // ✅ RELOAD lại cart từ server để đảm bảo đồng bộ
+        await this.loadCart();
       } catch (err) {
         console.error("❌ Lỗi xóa:", err);
         console.error("❌ Response:", err.response?.data);

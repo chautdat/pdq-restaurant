@@ -126,7 +126,7 @@ public class CartService {
         return mapToResponse(cart);
     }
 
-    @Transactional(readOnly = false) // 🔥 delete item -> phải writable
+    @Transactional
     public CartResponse removeCartItem(String userEmail, Long cartItemId) {
         User user = getUserByEmail(userEmail);
         Cart cart = getOrCreateCart(user);
@@ -138,8 +138,14 @@ public class CartService {
             throw new BadRequestException("Cart item does not belong to user");
         }
 
+        // ✅ Xóa khỏi cart's items collection trước
+        cart.getItems().remove(cartItem);
+        
+        // ✅ Xóa từ database
         cartItemRepository.delete(cartItem);
+        cartItemRepository.flush(); // 🔥 Force flush để đảm bảo xóa ngay
 
+        // ✅ Refresh cart từ database
         cart = cartRepository.findById(cart.getCartId()).orElseThrow();
         return mapToResponse(cart);
     }

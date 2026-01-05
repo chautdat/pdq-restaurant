@@ -100,6 +100,12 @@ public class PaymentController {
         System.out.println("   Response Code: " + responseCode);
         System.out.println("   Payment Success: " + success);
 
+        // ✅ Nếu user HỦY thanh toán (responseCode = 24) → redirect về home
+        if ("24".equals(responseCode)) {
+            System.out.println("⚠️ User cancelled payment - Redirecting to home");
+            return new RedirectView(frontendUrl + "/#/");
+        }
+
         // ✅ Parse amount (VNPay sends amount * 100)
         long amount = 0;
         try {
