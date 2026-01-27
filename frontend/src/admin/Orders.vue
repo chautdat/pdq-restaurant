@@ -10,7 +10,6 @@
           </h1>
           <p class="subtitle">Quản lý món ăn và danh mục của nhà hàng</p>
         </div>
-
         <!-- Quick Stats -->
         <div class="quick-stats">
           <div class="stat-item blue">
